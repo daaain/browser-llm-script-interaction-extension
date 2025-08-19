@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Chat Extension Settings</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>LLM Chat Extension Settings</h1>
+    </header>
+
+    <main>
+      <section class="settings-section">
+        <h2>LLM Provider Configuration</h2>
+        
+        <div class="form-group">
+          <label for="provider-select">Provider:</label>
+          <select id="provider-select">
+            <option value="">Select a provider...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="endpoint-input">API Endpoint:</label>
+          <input type="url" id="endpoint-input" placeholder="https://api.example.com/v1/chat/completions">
+        </div>
+
+        <div class="form-group">
+          <label for="model-input">Model:</label>
+          <input type="text" id="model-input" placeholder="gpt-4">
+        </div>
+
+        <div class="form-group">
+          <label for="api-key-input">API Key:</label>
+          <input type="password" id="api-key-input" placeholder="Enter your API key (leave empty for local models)">
+        </div>
+
+        <div class="form-actions">
+          <button id="test-connection" class="btn-secondary">Test Connection</button>
+          <button id="save-settings" class="btn-primary">Save Settings</button>
+        </div>
+
+        <div id="status-message" class="status-message"></div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Chat History</h2>
+        <p>Your chat history is stored locally in the browser.</p>
+        <button id="clear-history" class="btn-secondary">Clear Chat History</button>
+      </section>
+    </main>
+  </div>
+
+  <script src="index.ts" type="module"></script>
+</body>
+</html>

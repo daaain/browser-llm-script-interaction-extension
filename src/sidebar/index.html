@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Chat</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="chat-container">
+    <header class="chat-header">
+      <h1>LLM Chat</h1>
+      <button id="settings-btn" class="settings-btn" title="Open Settings">⚙️</button>
+    </header>
+
+    <div class="messages-container">
+      <div id="messages" class="messages">
+        <div class="welcome-message">
+          <h3>Welcome to LLM Chat!</h3>
+          <p>Start a conversation with your configured LLM. Make sure to configure your settings first.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="status" class="status"></span>
+    </div>
+
+    <div class="input-container">
+      <textarea 
+        id="message-input" 
+        class="message-input" 
+        placeholder="Type your message..."
+        rows="2"
+      ></textarea>
+      <button id="send-btn" class="send-btn">Send</button>
+    </div>
+  </div>
+
+  <script src="index.ts" type="module"></script>
+</body>
+</html>
