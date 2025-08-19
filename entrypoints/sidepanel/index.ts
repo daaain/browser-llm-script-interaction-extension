@@ -4,7 +4,7 @@ import type {
   ExtensionSettings,
   MessageFromSidebar,
   MessageToSidebar,
-} from "../shared/types";
+} from "~/utils/types";
 
 class ChatInterface {
   private currentSettings: ExtensionSettings | null = null;

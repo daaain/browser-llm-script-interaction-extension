@@ -5,93 +5,99 @@ A cross-browser extension that provides a simple chat interface for interacting 
 ## Features
 
 - 🌐 Cross-browser support (Chrome & Firefox)  
-- 💬 Simple chat interface via sidebar/popup
+- 💬 Simple chat interface via popup
 - ⚙️ Configurable LLM providers (OpenAI, LM Studio, Custom)
 - 💾 Persistent chat history
 - 🔒 Secure API key storage
-- ✅ TypeScript with full testing suite
 
-## Development
+## Quick Start
 
-### Setup
-
-```sh
-# Install dependencies
-pnpm install
-
-# Build for Chrome
-pnpm build:chrome
-
-# Build for Firefox  
-pnpm build:firefox
-
-# Development with hot reload
-pnpm dev:chrome
-pnpm dev:firefox
-```
-
-### Testing
-
-```sh
-# Run unit tests
-pnpm test
-
-# Run linting
-pnpm lint
-
-# Run E2E tests (requires built extension)
-pnpm test:e2e
-```
+Ready-to-use extension builds are available in the releases section. For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Installation
 
-### Chrome
+### Chrome Installation
 
-1. Build the extension: `pnpm build:chrome`
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode"
-4. Click "Load unpacked" and select the `dist/chrome` folder
+1. **Build the extension**:
 
-### Firefox
+   ```bash
+   pnpm build:chrome
+   ```
 
-1. Build the extension: `pnpm build:firefox`
-2. Open Firefox and go to `about:debugging`
-3. Click "This Firefox" → "Load Temporary Add-on"
-4. Select the `dist/firefox/manifest.json` file
+2. **Load in Chrome**:
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode" (toggle in top-right)
+   - Click "Load unpacked"
+   - Select the `.output/chrome-mv3` folder
+   - The extension should now appear in your extensions list
 
-## LM Studio Integration
+3. **Access the extension**:
+   - Click the extension icon in the toolbar to open the popup
+   - Or right-click the extension icon → Options to configure
 
-1. **Start LM Studio** and load a model
-2. **Go to Developer tab** in LM Studio
-3. **Start Server** (default: <http://localhost:1234>)
-4. **Open extension settings** and select "LM Studio" provider
-5. **Test connection** to verify setup
-6. **Start chatting** via the sidebar (Chrome) or popup (Firefox)
+### Firefox Installation
 
-### LM Studio Configuration
+1. **Build the extension**:
 
-- **Endpoint**: `http://localhost:1234/v1/chat/completions`
-- **Model**: Use any model name (e.g., "local-model")
-- **API Key**: Leave blank (not required for local models)
+   ```bash
+   pnpm build:firefox
+   ```
 
-## Architecture
+2. **Load in Firefox**:
+   - Open Firefox and navigate to `about:debugging`
+   - Click "This Firefox"
+   - Click "Load Temporary Add-on..."
+   - Navigate to the `.output/firefox-mv2` folder and select `manifest.json`
+   - The extension should now appear in your add-ons list
 
-```sh
-src/
-├── background/        # Service worker with LLM integration
-├── sidebar/           # Chat interface (Chrome sidebar)  
-├── settings/          # Configuration page
-├── shared/            # Type definitions and utilities
-└── manifest*.json     # Browser-specific manifests
-```
+3. **Access the extension**:
+   - Click the extension icon in the toolbar to open the popup
+   - Or go to Add-ons Manager → Extensions to configure
 
-## Browser Differences
+## Configuration
 
-| Feature | Chrome | Firefox |
-|---------|--------|---------|
-| Chat UI | Sidebar | Popup |  
-| Manifest | V3 | V2 |
-| Permissions | sidePanel, storage | storage |
+### Initial Setup
+
+1. **Open Settings**:
+   - Click the gear icon (⚙️) in the extension popup
+   - Or right-click the extension icon → Options
+
+2. **Configure LM Studio** (recommended for local models):
+   - Select "LM Studio" from the provider dropdown
+   - Endpoint: `http://localhost:1234/v1/chat/completions` (default)
+   - Model: Enter any name (e.g., "local-model")
+   - API Key: Leave blank
+   - Click "Test Connection" to verify
+   - Click "Save Settings"
+
+3. **Start LM Studio**:
+   - Launch LM Studio application
+   - Load a chat model
+   - Go to Developer tab
+   - Start the local server (should show green indicator)
+
+4. **Start Chatting**:
+   - Open the extension popup
+   - Type your message and press Enter
+   - The extension will communicate with your local LLM
+
+### Alternative Providers
+
+You can also configure:
+
+- **OpenAI API**: Requires API key
+- **Custom endpoints**: Any OpenAI-compatible API
+
+## Troubleshooting
+
+- **Extension won't load**: Check browser console for errors
+- **Can't connect to LM Studio**: Ensure server is running on localhost:1234
+- **No response from LLM**: Check LM Studio logs and network requests in DevTools
+- **Permissions issues**: Make sure developer mode is enabled
+
+## Development
+
+For development setup, testing, and contribution guidelines, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## API Compatibility
 

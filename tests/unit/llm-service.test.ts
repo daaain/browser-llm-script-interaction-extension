@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LLMService } from "../../src/background/llm-service";
-import type { ChatMessage, LLMProvider } from "../../src/shared/types";
+import { LLMService } from "../../utils/llm-service";
+import type { ChatMessage, LLMProvider } from "../../utils/types";
 
 global.fetch = vi.fn();
 

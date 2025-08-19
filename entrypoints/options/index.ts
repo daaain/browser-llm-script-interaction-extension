@@ -1,6 +1,6 @@
 import browser from "webextension-polyfill";
-import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from "../shared/types";
-import { DEFAULT_PROVIDERS } from "../shared/types";
+import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from "~/utils/types";
+import { DEFAULT_PROVIDERS } from "~/utils/types";
 
 class SettingsManager {
   private currentSettings: ExtensionSettings | null = null;

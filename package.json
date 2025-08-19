@@ -4,12 +4,12 @@
   "description": "A browser extension that enables LLMs to interact through a chat interface",
   "type": "module",
   "scripts": {
-    "dev": "vite build --mode development --watch",
-    "dev:chrome": "echo 'Building Chrome extension in watch mode...' && TARGET=chrome vite build --mode development --watch",
-    "dev:firefox": "echo 'Building Firefox extension in watch mode...' && BROWSER='/Applications/Firefox Developer Edition.app/Contents/MacOS/firefox' TARGET=firefox vite build --mode development --watch",
-    "build": "tsc && vite build",
-    "build:chrome": "tsc && TARGET=chrome vite build",
-    "build:firefox": "tsc && TARGET=firefox vite build",
+    "dev": "wxt",
+    "dev:chrome": "wxt -b chrome",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:chrome": "wxt build -b chrome",
+    "build:firefox": "wxt build -b firefox",
     "test": "vitest",
     "test:ci": "vitest --run",
     "test:ui": "vitest --run --ui",
@@ -27,14 +27,12 @@
     "@types/jsdom": "^21.1.7",
     "@types/node": "^24.2.1",
     "@types/webextension-polyfill": "^0.12.3",
-    "@vitejs/plugin-vue": "^6.0.1",
     "@vitest/ui": "^3.2.4",
     "jsdom": "^26.1.0",
     "playwright": "^1.54.2",
     "typescript": "^5.9.2",
-    "vite": "^7.1.2",
-    "vite-plugin-web-extension": "^4.4.5",
     "vitest": "^3.2.4",
-    "webextension-polyfill": "^0.12.0"
+    "webextension-polyfill": "^0.12.0",
+    "wxt": "^0.20.8"
   }
 }
