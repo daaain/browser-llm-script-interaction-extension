@@ -1,6 +1,12 @@
 import { defineConfig } from "wxt";
 
 export default defineConfig({
+  webExt: {
+    firefoxPrefs: { "datareporting.policy.firstRunURL": "" },
+  },
+  vite: () => ({
+    base: "./",
+  }),
   manifest: ({ browser }) => ({
     name: "LLM actions",
     description: "Create actions for any website using an LLM",
@@ -23,7 +29,7 @@ export default defineConfig({
           },
         }
       : {}),
-    // Firefox sidebar
+    // Firefox sidebar and background
     ...(browser === "firefox"
       ? {
           sidebar_action: {

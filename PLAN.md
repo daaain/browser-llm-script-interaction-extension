@@ -2,6 +2,10 @@
 
 NOTE: please use this as an initial plan to set the direction, but you don't have to take everything verbatim.
 
+Roadmap / TODO:
+
+- recursive LLM scripting: have an LLM generate saveable scripts that can also call an LLM, so incorporating the alt text generator as an example would be perfect
+
 ## Overview
 
 A browser extension that enables LLMs to interact with web pages through a lightweight API, using a persistent sidebar for chat interaction and supporting multiple LLM providers through OpenAI-compatible APIs with tool use.

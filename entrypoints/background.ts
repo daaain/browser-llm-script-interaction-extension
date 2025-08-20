@@ -14,7 +14,8 @@ async function getSettings(): Promise<ExtensionSettings> {
   console.log("Getting settings from storage...");
 
   try {
-    const result = await browser.storage.sync.get(["settings"]);
+    // Use local storage for better Firefox compatibility
+    const result = await browser.storage.local.get(["settings"]);
     console.log("Storage result:", result);
 
     if (result.settings) {
@@ -31,7 +32,7 @@ async function getSettings(): Promise<ExtensionSettings> {
       chatHistory: [],
     };
 
-    await browser.storage.sync.set({ settings: defaultSettings });
+    await browser.storage.local.set({ settings: defaultSettings });
     console.log("Default settings saved");
     return defaultSettings;
   } catch (error) {
@@ -44,7 +45,7 @@ async function saveSettings(settings: ExtensionSettings): Promise<void> {
   console.log("Saving settings:", settings);
 
   try {
-    await browser.storage.sync.set({ settings });
+    await browser.storage.local.set({ settings });
     console.log("Settings saved successfully");
     llmService = new LLMService(settings.provider);
   } catch (error) {
@@ -94,9 +95,13 @@ async function sendChatMessage(message: string): Promise<string> {
 }
 
 export default defineBackground({
+  persistent: true,
   main() {
+    console.log("Background script starting...");
+    
     // Configure sidepanel to open automatically when action icon is clicked
     if (browser.sidePanel) {
+      console.log("Chrome: Setting up sidePanel");
       browser.sidePanel
         .setPanelBehavior({ openPanelOnActionClick: true })
         .catch((error) => console.error("Error setting panel behavior:", error));
@@ -104,7 +109,8 @@ export default defineBackground({
     
     // Fallback for Firefox - open sidebar when action is clicked
     if (browser.sidebarAction) {
-      browser.action.onClicked.addListener(async () => {
+      console.log("Firefox: Setting up sidebarAction");
+      browser.browserAction.onClicked.addListener(async () => {
         try {
           await browser.sidebarAction.open();
         } catch (error) {
@@ -113,17 +119,21 @@ export default defineBackground({
       });
     }
 
+    console.log("Setting up message listener...");
     browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
       const handleMessage = async () => {
         try {
+          console.log("Received message:", message);
           const msg = message as MessageFromSidebar;
           switch (msg.type) {
             case "GET_SETTINGS": {
+              console.log("Processing GET_SETTINGS request");
               const settings = await getSettings();
               const response: MessageToSidebar = {
                 type: "SETTINGS_RESPONSE",
                 payload: settings,
               };
+              console.log("Sending settings response:", response);
               sendResponse(response);
               break;
             }
