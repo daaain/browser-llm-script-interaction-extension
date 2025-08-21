@@ -11,6 +11,8 @@ import type {
 import { DEFAULT_PROVIDERS } from "~/utils/types";
 import { DEFAULT_TRUNCATION_LIMIT } from "~/utils/constants";
 import { LLMService } from "~/utils/llm-service";
+import { isValidLLMHelperMethod, parseToolCallArguments } from "~/utils/tool-schema-generator";
+import type { LLMToolCall } from "~/utils/types";
 
 let llmService: LLMService | null = null;
 
@@ -40,6 +42,12 @@ async function getSettings(): Promise<ExtensionSettings> {
         console.log("Added missing truncationLimit to existing settings");
       }
       
+      if (typeof settings.toolsEnabled === 'undefined') {
+        settings.toolsEnabled = false;
+        needsUpdate = true;
+        console.log("Added missing toolsEnabled to existing settings");
+      }
+      
       if (needsUpdate) {
         await browser.storage.local.set({ settings });
       }
@@ -56,6 +64,7 @@ async function getSettings(): Promise<ExtensionSettings> {
       chatHistory: [],
       debugMode: false,
       truncationLimit: DEFAULT_TRUNCATION_LIMIT,
+      toolsEnabled: false,
     };
 
     await browser.storage.local.set({ settings: defaultSettings });
@@ -73,7 +82,7 @@ async function saveSettings(settings: ExtensionSettings): Promise<void> {
   try {
     await browser.storage.local.set({ settings });
     console.log("Settings saved successfully");
-    llmService = new LLMService(settings.provider);
+    llmService = new LLMService(settings.provider, settings.toolsEnabled);
   } catch (error) {
     console.error("Error saving settings:", error);
     throw error;
@@ -83,7 +92,7 @@ async function saveSettings(settings: ExtensionSettings): Promise<void> {
 async function sendChatMessage(message: string, tabId?: number): Promise<string> {
   if (!llmService) {
     const settings = await getSettings();
-    llmService = new LLMService(settings.provider);
+    llmService = new LLMService(settings.provider, settings.toolsEnabled);
   }
 
   const settings = await getSettings();
@@ -101,39 +110,244 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
     : settings.chatHistory;
 
   const messagesForAPI = [...conversationHistory, newMessage];
+  
+  // Include tools if enabled and we haven't already used tools in this conversation
+  const hasToolCalls = conversationHistory.some(msg => msg.tool_calls && msg.tool_calls.length > 0);
+  const shouldIncludeTools = settings.toolsEnabled && !hasToolCalls;
+  const finalTools = shouldIncludeTools ? llmService.getAvailableTools() : undefined;
+  
+  console.log(`Sending message with tools: ${finalTools ? 'enabled' : 'disabled'}, hasToolCalls: ${hasToolCalls}`);
+  
+  // Create a temporary streaming message for real-time updates
+  const streamingMessageId = `streaming-${Date.now()}`;
+  let streamingMessage: ChatMessage = {
+    id: streamingMessageId,
+    role: "assistant",
+    content: "",
+    timestamp: Date.now(),
+    isStreaming: true, // Add flag to indicate streaming
+  };
 
-  const response = await llmService.sendMessage(messagesForAPI);
+  // Add streaming message to conversation immediately
+  let currentConversation = [...messagesForAPI, streamingMessage];
+  
+  // Save the initial streaming message
+  if (tabId) {
+    const tabConversations = settings.tabConversations || {};
+    tabConversations[tabId.toString()] = currentConversation;
+    await browser.storage.local.set({ 
+      settings: { ...settings, tabConversations } 
+    });
+  } else {
+    await browser.storage.local.set({ 
+      settings: { ...settings, chatHistory: currentConversation } 
+    });
+  }
+
+  // Debounced storage update for streaming
+  let updateTimeout: NodeJS.Timeout | null = null;
+  const updateStorage = async (content: string, isComplete: boolean) => {
+    streamingMessage.content = content;
+    if (isComplete) {
+      delete (streamingMessage as any).isStreaming;
+    }
+    
+    // Update conversation
+    currentConversation = [...messagesForAPI, streamingMessage];
+    
+    // Debounce storage updates (except for completion)
+    if (updateTimeout && !isComplete) {
+      clearTimeout(updateTimeout);
+    }
+    
+    const doUpdate = async () => {
+      try {
+        if (tabId) {
+          const currentSettings = await getSettings();
+          const tabConversations = currentSettings.tabConversations || {};
+          tabConversations[tabId.toString()] = currentConversation;
+          await browser.storage.local.set({ 
+            settings: { ...currentSettings, tabConversations } 
+          });
+        } else {
+          const currentSettings = await getSettings();
+          await browser.storage.local.set({ 
+            settings: { ...currentSettings, chatHistory: currentConversation } 
+          });
+        }
+      } catch (error) {
+        console.error("Error updating streaming message:", error);
+      }
+    };
+    
+    if (isComplete) {
+      await doUpdate();
+    } else {
+      updateTimeout = setTimeout(doUpdate, 100); // 100ms debounce
+    }
+  };
+
+  const response = await llmService.sendMessage(messagesForAPI, finalTools, updateStorage);
 
   if (response.error) {
     throw new Error(response.error);
   }
 
-  const assistantMessage: ChatMessage = {
-    id: (Date.now() + 1).toString(),
-    role: "assistant",
-    content: response.content,
-    timestamp: Date.now(),
-  };
+  // Update the streaming message with final content and tool calls
+  streamingMessage.content = response.content;
+  streamingMessage.tool_calls = response.tool_calls;
+  delete (streamingMessage as any).isStreaming;
 
-  const updatedConversation = [...messagesForAPI, assistantMessage];
-
-  // Save to appropriate conversation history
-  if (tabId) {
-    const tabConversations = settings.tabConversations || {};
-    tabConversations[tabId.toString()] = updatedConversation;
+  let updatedConversation = [...messagesForAPI, streamingMessage];
+  
+  // Handle tool calls if present
+  if (response.tool_calls && response.tool_calls.length > 0) {
+    console.log(`Processing ${response.tool_calls.length} tool calls`);
     
-    await saveSettings({
-      ...settings,
-      tabConversations,
-    });
-  } else {
-    await saveSettings({
-      ...settings,
-      chatHistory: updatedConversation,
-    });
+    // Execute each tool call and collect results
+    const toolResults: Array<{id: string, result: any, error?: string}> = [];
+    
+    for (const toolCall of response.tool_calls) {
+      try {
+        const toolResult = await executeToolCall(toolCall);
+        toolResults.push({
+          id: toolCall.id,
+          result: toolResult.result
+        });
+        
+        console.log(`Tool call ${toolCall.function.name} executed successfully`);
+      } catch (error) {
+        console.error(`Error executing tool call ${toolCall.function.name}:`, error);
+        toolResults.push({
+          id: toolCall.id,
+          result: null,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+    
+    // Add tool results to the streaming message
+    streamingMessage.tool_results = toolResults;
+    
+    // Update storage to show tool execution completed
+    currentConversation = [...messagesForAPI, streamingMessage];
+    if (tabId) {
+      const currentSettings = await getSettings();
+      const tabConversations = currentSettings.tabConversations || {};
+      tabConversations[tabId.toString()] = currentConversation;
+      await browser.storage.local.set({ 
+        settings: { ...currentSettings, tabConversations } 
+      });
+    } else {
+      const currentSettings = await getSettings();
+      await browser.storage.local.set({ 
+        settings: { ...currentSettings, chatHistory: currentConversation } 
+      });
+    }
+    
+    // Build conversation for final LLM call (including tool results as separate messages)
+    const conversationForFinalCall = [...messagesForAPI, streamingMessage];
+    for (const toolResult of toolResults) {
+      conversationForFinalCall.push({
+        id: `tool-${toolResult.id}`,
+        role: "tool" as const,
+        content: toolResult.error ? `Error: ${toolResult.error}` : JSON.stringify(toolResult.result),
+        timestamp: Date.now(),
+        tool_call_id: toolResult.id,
+      });
+    }
+    
+    // Get final response from LLM with tool results
+    try {
+      const finalResponseCallback = async (content: string, isComplete: boolean) => {
+        // Update the streaming message with final content
+        streamingMessage.content = content;
+        if (isComplete) {
+          delete (streamingMessage as any).isStreaming;
+        }
+        
+        // Update conversation with final response
+        currentConversation = [...messagesForAPI, streamingMessage];
+        
+        // Update storage with debouncing for final response
+        const doUpdate = async () => {
+          try {
+            if (tabId) {
+              const currentSettings = await getSettings();
+              const tabConversations = currentSettings.tabConversations || {};
+              tabConversations[tabId.toString()] = currentConversation;
+              await browser.storage.local.set({ 
+                settings: { ...currentSettings, tabConversations } 
+              });
+            } else {
+              const currentSettings = await getSettings();
+              await browser.storage.local.set({ 
+                settings: { ...currentSettings, chatHistory: currentConversation } 
+              });
+            }
+          } catch (error) {
+            console.error("Error updating final response:", error);
+          }
+        };
+        
+        if (isComplete) {
+          await doUpdate();
+        } else {
+          // Small debounce for final response streaming
+          setTimeout(doUpdate, 50);
+        }
+      };
+      
+      const finalResponse = await llmService.sendMessage(conversationForFinalCall, undefined, finalResponseCallback);
+      
+      if (finalResponse.content) {
+        // Update the streaming message with final content
+        streamingMessage.content = finalResponse.content;
+        delete (streamingMessage as any).isStreaming;
+        
+        // Return the final response content
+        response.content = finalResponse.content;
+      }
+    } catch (error) {
+      console.error("Error getting final response after tool calls:", error);
+      // Keep the original tool call response
+    }
+  }
+
+  // Final save to conversation history (only if no tool calls, as tool calls handle their own saves)
+  if (!response.tool_calls || response.tool_calls.length === 0) {
+    if (tabId) {
+      const tabConversations = settings.tabConversations || {};
+      tabConversations[tabId.toString()] = updatedConversation;
+      
+      await saveSettings({
+        ...settings,
+        tabConversations,
+      });
+    } else {
+      await saveSettings({
+        ...settings,
+        chatHistory: updatedConversation,
+      });
+    }
   }
 
   return response.content;
+}
+
+async function executeToolCall(toolCall: LLMToolCall): Promise<ContentScriptFunctionResponse> {
+  const { name: functionName, arguments: argumentsString } = toolCall.function;
+  
+  // Validate that this is a valid LLMHelper method
+  if (!isValidLLMHelperMethod(functionName)) {
+    throw new Error(`Invalid tool function: ${functionName}`);
+  }
+  
+  // Parse and validate arguments
+  const args = parseToolCallArguments(functionName, argumentsString);
+  
+  // Execute the function via content script
+  return await executeContentScriptFunction(functionName, args);
 }
 
 async function executeContentScriptFunction(

@@ -19,7 +19,27 @@ export default defineContentScript({
           const args = request.arguments || {};
           
           if (functionName in LLMHelper) {
-            const result = (LLMHelper as any)[functionName](...Object.values(args));
+            // Handle function arguments properly based on function signature
+            let result;
+            switch (functionName) {
+              case 'find':
+                result = LLMHelper.find(args.pattern, args.options);
+                break;
+              case 'extract':
+                result = LLMHelper.extract(args.elementId, args.property);
+                break;
+              case 'describe':
+                result = LLMHelper.describe(args.selector);
+                break;
+              case 'summary':
+                result = LLMHelper.summary();
+                break;
+              case 'clear':
+                result = LLMHelper.clear();
+                break;
+              default:
+                throw new Error(`Unknown function: ${functionName}`);
+            }
             const response = { success: true, result };
             sendResponse(response);
           } else {

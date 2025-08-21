@@ -129,7 +129,10 @@ test.describe("Complete User Workflow", () => {
     expect(newValidity).toBe(true);
   });
 
-  test("should execute LLMHelper function and include results in chat context", async ({ context, extensionId }) => {
+  test("should execute LLMHelper function and include results in chat context", async ({
+    context,
+    extensionId,
+  }) => {
     // Step 1: Open sidepanel directly
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
@@ -172,11 +175,11 @@ test.describe("Complete User Workflow", () => {
 
     // Welcome message should be visible after clearing
     await expect(sidepanelPage.locator(".welcome-message")).toBeVisible();
-    
+
     // Input should still be functional
     await expect(messageInput).toBeVisible();
     await expect(sendBtn).toBeVisible();
-    
+
     // Note: Status message indicating chat was cleared may appear briefly
 
     // Step 6: Verify all test buttons are present for LLMHelper functions
@@ -185,34 +188,37 @@ test.describe("Complete User Workflow", () => {
     await expect(sidepanelPage.locator("#test-find")).toBeVisible();
   });
 
-  test("should maintain stable chat UI without flicker during operations", async ({ context, extensionId }) => {
+  test("should maintain stable chat UI without flicker during operations", async ({
+    context,
+    extensionId,
+  }) => {
     // Open sidepanel
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
     // Verify initial state
     await expect(sidepanelPage.locator(".welcome-message").first()).toBeVisible();
-    
+
     // Type a message but don't send it
     const messageInput = sidepanelPage.locator("#message-input");
     await messageInput.fill("Test message");
-    
+
     // Clear chat should not affect the input field content
     const clearBtn = sidepanelPage.locator("#clear-btn");
     await clearBtn.click();
     await sidepanelPage.waitForTimeout(500);
-    
+
     // Welcome message should still be there
     await expect(sidepanelPage.locator(".welcome-message").first()).toBeVisible();
-    
+
     // Input field should maintain its content and be functional
     await expect(messageInput).toHaveValue("Test message");
     await expect(messageInput).toBeEditable();
-    
+
     // Clear input and verify it works
     await messageInput.clear();
     await expect(messageInput).toHaveValue("");
-    
+
     // Type again to ensure input is responsive
     await messageInput.fill("Another test");
     await expect(messageInput).toHaveValue("Another test");

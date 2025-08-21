@@ -7,14 +7,45 @@ export interface LLMProvider {
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   content: string;
   timestamp: number;
+  tool_calls?: LLMToolCall[];
+  tool_call_id?: string;
+  isStreaming?: boolean;
+  tool_results?: Array<{id: string, result: any, error?: string}>;
 }
 
 export interface LLMResponse {
   content: string;
   error?: string;
+  tool_calls?: LLMToolCall[];
+}
+
+export interface LLMToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface LLMTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, {
+        type: string;
+        description?: string;
+        enum?: string[];
+      }>;
+      required?: string[];
+    };
+  };
 }
 
 export interface ExtensionSettings {
@@ -23,6 +54,7 @@ export interface ExtensionSettings {
   debugMode: boolean;
   truncationLimit: number;
   tabConversations?: { [tabId: string]: ChatMessage[] };
+  toolsEnabled: boolean;
 }
 
 export interface MessageFromSidebar {

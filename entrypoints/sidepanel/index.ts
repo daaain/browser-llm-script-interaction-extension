@@ -4,6 +4,7 @@ import type {
   ExtensionSettings,
   MessageFromSidebar,
   MessageToSidebar,
+  LLMToolCall,
 } from "~/utils/types";
 
 class ChatInterface {
@@ -133,13 +134,13 @@ class ChatInterface {
       type: "SEND_MESSAGE",
       payload: { message: messageText, tabId: this.tabId },
     };
-
+    
     try {
       const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
 
       if (response.type === "MESSAGE_RESPONSE") {
         this.showStatus("");
-        // Messages will be displayed via storage listener - no need to add directly
+        // Messages will be displayed via storage listener
       } else if (response.type === "ERROR") {
         this.showStatus(`Error: ${response.payload.error}`, "error");
       }
@@ -153,17 +154,83 @@ class ChatInterface {
   }
 
   private addMessageToUI(message: ChatMessage) {
+    // Check if message already exists and update it
+    const existingElement = this.messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
+    if (existingElement) {
+      this.updateMessageElement(existingElement as HTMLElement, message);
+      return;
+    }
+
     const messageElement = document.createElement("div");
     messageElement.className = `message ${message.role}`;
+    messageElement.dataset.messageId = message.id;
 
-    const content = this.formatMessageContent(message.content);
-    messageElement.innerHTML = content;
-
+    this.updateMessageElement(messageElement, message);
     this.messagesContainer.appendChild(messageElement);
     this.scrollToBottom();
   }
 
+  private updateMessageElement(messageElement: HTMLElement, message: ChatMessage) {
+    // Add or remove streaming class
+    if (message.isStreaming) {
+      messageElement.classList.add("streaming");
+    } else {
+      messageElement.classList.remove("streaming");
+    }
+
+    let content = "";
+    
+    // Handle different message types
+    if (message.role === "tool") {
+      // Hide tool messages as they're now integrated into assistant messages
+      messageElement.style.display = 'none';
+      return;
+    } else if (message.role === "assistant") {
+      // Build structured content with proper ordering
+      const contentParts: string[] = [];
+      
+      // Show tool calls first if present
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        const toolCallsHtml = message.tool_calls.map((tc: LLMToolCall) => 
+          `<div class="tool-call">
+            <strong>🛠️ Calling:</strong><br>${tc.function.name}(${this.formatToolArguments(tc.function.arguments)})
+          </div>`
+        ).join("");
+        contentParts.push(toolCallsHtml);
+      }
+      
+      // Show tool results next if present
+      if (message.tool_results && message.tool_results.length > 0) {
+        const toolResultsHtml = message.tool_results.map((tr: {id: string, result: any, error?: string}) => 
+          `<div class="tool-result">
+            <strong>🔧 Tool Result:</strong>
+            <pre><code>${tr.error ? `Error: ${tr.error}` : this.formatToolResult(JSON.stringify(tr.result))}</code></pre>
+          </div>`
+        ).join("");
+        contentParts.push(toolResultsHtml);
+      }
+      
+      // Show assistant response content last (only if not empty)
+      if (message.content && message.content.trim()) {
+        contentParts.push(this.formatMessageContent(message.content));
+      }
+      
+      content = contentParts.join("");
+    } else {
+      content = this.formatMessageContent(message.content);
+    }
+    
+    // Only update innerHTML if content actually changed (optimization for streaming)
+    if (messageElement.innerHTML !== content) {
+      messageElement.innerHTML = content;
+    }
+    
+    this.scrollToBottom();
+  }
+
   private formatMessageContent(content: string): string {
+    if (!content) return "";
+    
     let formatted = content;
 
     formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, "<pre><code>$2</code></pre>");
@@ -176,6 +243,24 @@ class ChatInterface {
     formatted = formatted.replace(/\n/g, "<br>");
 
     return formatted;
+  }
+  
+  private formatToolArguments(argumentsString: string): string {
+    try {
+      const args = JSON.parse(argumentsString);
+      return JSON.stringify(args, null, 2);
+    } catch {
+      return argumentsString;
+    }
+  }
+  
+  private formatToolResult(result: string): string {
+    try {
+      const parsed = JSON.parse(result);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return result;
+    }
   }
 
   private scrollToBottom() {
@@ -247,20 +332,21 @@ class ChatInterface {
         // Get the current tab's chat history
         const currentTabHistory = this.getTabChatHistory(newSettings);
         
-        // Only update if there are actually new messages
+        // Update current settings
+        this.currentSettings = newSettings;
+        
         if (currentTabHistory.length > this.lastDisplayedHistoryLength) {
-          // Update current settings
-          this.currentSettings = newSettings;
-          
           // Add only the new messages to avoid flicker
           const newMessages = currentTabHistory.slice(this.lastDisplayedHistoryLength);
           this.addNewMessagesToUI(newMessages);
-          
           this.lastDisplayedHistoryLength = currentTabHistory.length;
         } else if (currentTabHistory.length < this.lastDisplayedHistoryLength) {
           // History was cleared or reduced, do a full refresh
-          this.currentSettings = newSettings;
           this.refreshChatDisplay();
+        } else if (currentTabHistory.length === this.lastDisplayedHistoryLength) {
+          // Same number of messages but content might have changed (streaming updates)
+          // Update all existing messages that might have changed
+          this.updateExistingMessages(currentTabHistory);
         }
       }
     });
@@ -273,9 +359,23 @@ class ChatInterface {
       welcomeMessage.remove();
     }
     
-    // Add new messages
+    // Add new messages (filter out tool messages as they're integrated into assistant messages)
     messages.forEach((message) => {
-      this.addMessageToUI(message);
+      if (message.role !== "tool") {
+        this.addMessageToUI(message);
+      }
+    });
+  }
+
+  private updateExistingMessages(messages: ChatMessage[]): void {
+    // Update all existing messages that might have changed content
+    messages.forEach((message) => {
+      if (message.role !== "tool") {
+        const existingElement = this.messagesContainer.querySelector(`[data-message-id="${message.id}"]`);
+        if (existingElement) {
+          this.updateMessageElement(existingElement as HTMLElement, message);
+        }
+      }
     });
   }
 
@@ -356,8 +456,8 @@ class ChatInterface {
         this.clearUIMessages();
         this.showWelcomeMessage();
         
-        this.showStatus('Chat cleared', '');
-        setTimeout(() => this.showStatus('', ''), 2000);
+        this.showStatus('Chat cleared');
+        setTimeout(() => this.showStatus(''), 2000);
       }
     } catch (error) {
       console.error('Error clearing chat:', error);
@@ -386,7 +486,8 @@ class ChatInterface {
     welcomeMessage.className = 'welcome-message';
     welcomeMessage.innerHTML = `
       <h3>Welcome to LLM Chat!</h3>
-      <p>Start a conversation with your configured LLM. Make sure to configure your settings first.</p>
+      <p>Start a conversation with your configured LLM. The assistant can now autonomously use browser automation tools when enabled in settings.</p>
+      <p><strong>Available Tools:</strong> find elements, extract text, get page summary, describe sections, and clear references.</p>
     `;
     this.messagesContainer.appendChild(welcomeMessage);
   }
@@ -410,12 +511,6 @@ class ChatInterface {
         }
       });
     }
-  }
-
-  private addTestResult(functionName: string, result: any) {
-    // Test results are now handled by the storage listener
-    // This method is kept for backwards compatibility but doesn't add UI messages directly
-    console.log(`Test result for ${functionName}:`, result);
   }
 }
 
