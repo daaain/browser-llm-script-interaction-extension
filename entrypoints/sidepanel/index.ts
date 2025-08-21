@@ -26,6 +26,7 @@ class ChatInterface {
     await this.loadSettings();
     this.setupEventListeners();
     this.displayChatHistory();
+    this.setupStorageListener();
   }
 
   private async loadSettings() {
@@ -60,6 +61,9 @@ class ChatInterface {
     settingsBtn.addEventListener("click", () => {
       browser.runtime.openOptionsPage();
     });
+
+    // Add test button handlers
+    this.setupTestButtons();
   }
 
   private displayChatHistory() {
@@ -182,6 +186,84 @@ class ChatInterface {
         this.statusElement.className = "status";
       }, 5000);
     }
+  }
+
+  private setupTestButtons() {
+    const testSummaryBtn = document.getElementById("test-summary");
+    const testExtractBtn = document.getElementById("test-extract");
+    const testFindBtn = document.getElementById("test-find");
+
+    testSummaryBtn?.addEventListener("click", () => this.testFunction("summary", {}));
+    testExtractBtn?.addEventListener("click", () => this.testFunction("extract", {}));
+    testFindBtn?.addEventListener("click", () => this.testFunction("find", { pattern: "button|download|save", options: { limit: 5 } }));
+  }
+
+  private async testFunction(functionName: string, args: any) {
+    this.showStatus(`Testing ${functionName}...`, "thinking");
+
+    const message: MessageFromSidebar = {
+      type: "EXECUTE_FUNCTION",
+      payload: {
+        function: functionName,
+        arguments: args,
+      },
+    };
+
+    try {
+      const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
+
+      if (response.type === "FUNCTION_RESPONSE") {
+        const result = response.payload;
+        if (result.success) {
+          this.showStatus(`${functionName} completed successfully`);
+          // Results are now automatically added to chat history via storage listener
+        } else {
+          this.showStatus(`${functionName} failed: ${result.error}`, "error");
+        }
+      } else if (response.type === "ERROR") {
+        this.showStatus(`Error: ${response.payload.error}`, "error");
+      }
+    } catch (error) {
+      console.error("Error testing function:", error);
+      this.showStatus("Error testing function. Please try again.", "error");
+    }
+  }
+
+  private setupStorageListener() {
+    // Listen for storage changes to update chat history when LLMHelper functions are executed
+    browser.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === 'local' && changes.settings && changes.settings.newValue) {
+        const newSettings = changes.settings.newValue as ExtensionSettings;
+        const oldSettings = changes.settings.oldValue as ExtensionSettings;
+        
+        // Check if chat history has been updated
+        if (newSettings.chatHistory.length > (oldSettings?.chatHistory?.length || 0)) {
+          // Update current settings and refresh chat display
+          this.currentSettings = newSettings;
+          this.refreshChatDisplay();
+        }
+      }
+    });
+  }
+
+  private refreshChatDisplay() {
+    // Clear current messages and redisplay the updated history
+    const messages = this.messagesContainer.querySelectorAll('.message');
+    messages.forEach(msg => msg.remove());
+    
+    // Remove welcome message if it exists
+    const welcomeMessage = this.messagesContainer.querySelector(".welcome-message");
+    if (welcomeMessage) {
+      welcomeMessage.remove();
+    }
+    
+    this.displayChatHistory();
+  }
+
+  private addTestResult(functionName: string, result: any) {
+    // Test results are now handled by the storage listener
+    // This method is kept for backwards compatibility but doesn't add UI messages directly
+    console.log(`Test result for ${functionName}:`, result);
   }
 }
 

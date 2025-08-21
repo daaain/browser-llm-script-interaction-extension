@@ -1,9 +1,11 @@
 import browser from "webextension-polyfill";
 import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from "~/utils/types";
 import { DEFAULT_PROVIDERS } from "~/utils/types";
+import { DEFAULT_TRUNCATION_LIMIT } from "~/utils/constants";
 
 class SettingsManager {
   private currentSettings: ExtensionSettings | null = null;
+  private autoSaveTimeout: number | null = null;
 
   constructor() {
     this.init();
@@ -67,13 +69,18 @@ class SettingsManager {
       this.currentSettings.provider.model;
     (document.getElementById("api-key-input") as HTMLInputElement).value =
       this.currentSettings.provider.apiKey || "";
+    (document.getElementById("debug-mode") as HTMLInputElement).checked =
+      this.currentSettings.debugMode || false;
+    (document.getElementById("truncation-limit-input") as HTMLInputElement).value =
+      this.currentSettings.truncationLimit?.toString() || DEFAULT_TRUNCATION_LIMIT.toString();
   }
 
   private setupEventListeners() {
     const providerSelect = document.getElementById("provider-select") as HTMLSelectElement;
     const endpointInput = document.getElementById("endpoint-input") as HTMLInputElement;
     const modelInput = document.getElementById("model-input") as HTMLInputElement;
-    const saveButton = document.getElementById("save-settings") as HTMLButtonElement;
+    const apiKeyInput = document.getElementById("api-key-input") as HTMLInputElement;
+    const truncationLimitInput = document.getElementById("truncation-limit-input") as HTMLInputElement;
     const testButton = document.getElementById("test-connection") as HTMLButtonElement;
     const clearHistoryButton = document.getElementById("clear-history") as HTMLButtonElement;
 
@@ -84,9 +91,19 @@ class SettingsManager {
         endpointInput.value = provider.endpoint;
         modelInput.value = provider.model;
       }
+      this.autoSave();
     });
 
-    saveButton.addEventListener("click", () => this.saveSettings());
+    // Auto-save on input changes
+    endpointInput.addEventListener("input", () => this.autoSave());
+    modelInput.addEventListener("input", () => this.autoSave());
+    apiKeyInput.addEventListener("input", () => this.autoSave());
+    truncationLimitInput.addEventListener("input", () => this.autoSave());
+    
+    // Auto-save for debug mode checkbox
+    const debugModeCheckbox = document.getElementById("debug-mode") as HTMLInputElement;
+    debugModeCheckbox.addEventListener("change", () => this.autoSave());
+
     testButton.addEventListener("click", () => this.testConnection());
     clearHistoryButton.addEventListener("click", () => this.clearHistory());
   }
@@ -95,6 +112,8 @@ class SettingsManager {
     const endpoint = (document.getElementById("endpoint-input") as HTMLInputElement).value;
     const model = (document.getElementById("model-input") as HTMLInputElement).value;
     const apiKey = (document.getElementById("api-key-input") as HTMLInputElement).value;
+    const debugMode = (document.getElementById("debug-mode") as HTMLInputElement).checked;
+    const truncationLimit = parseInt((document.getElementById("truncation-limit-input") as HTMLInputElement).value, 10) || DEFAULT_TRUNCATION_LIMIT;
 
     if (!endpoint || !model) {
       this.showMessage("Please fill in all required fields", "error");
@@ -109,6 +128,8 @@ class SettingsManager {
         model,
         apiKey: apiKey || undefined,
       },
+      debugMode,
+      truncationLimit,
     };
 
     const message: MessageFromSidebar = {
@@ -123,6 +144,55 @@ class SettingsManager {
     } catch (error) {
       console.error("Error saving settings:", error);
       this.showMessage("Error saving settings. Please try again.", "error");
+    }
+  }
+
+  private autoSave() {
+    // Clear existing timeout to debounce rapid changes
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+    }
+
+    // Auto-save after 1 second of no changes
+    this.autoSaveTimeout = setTimeout(() => {
+      this.saveSettingsQuietly();
+    }, 1000);
+  }
+
+  private async saveSettingsQuietly() {
+    try {
+      const endpoint = (document.getElementById("endpoint-input") as HTMLInputElement).value;
+      const model = (document.getElementById("model-input") as HTMLInputElement).value;
+      const apiKey = (document.getElementById("api-key-input") as HTMLInputElement).value;
+      const debugMode = (document.getElementById("debug-mode") as HTMLInputElement).checked;
+      const truncationLimit = parseInt((document.getElementById("truncation-limit-input") as HTMLInputElement).value, 10) || DEFAULT_TRUNCATION_LIMIT;
+
+      // Don't auto-save if required fields are empty
+      if (!endpoint || !model) {
+        return;
+      }
+
+      const updatedSettings: ExtensionSettings = {
+        ...this.currentSettings!,
+        provider: {
+          name: "Custom",
+          endpoint,
+          model,
+          apiKey: apiKey || undefined,
+        },
+        debugMode,
+        truncationLimit,
+      };
+
+      const message: MessageFromSidebar = {
+        type: "SAVE_SETTINGS",
+        payload: updatedSettings,
+      };
+
+      await browser.runtime.sendMessage(message);
+      this.currentSettings = updatedSettings;
+    } catch (error) {
+      console.error("Error auto-saving settings:", error);
     }
   }
 

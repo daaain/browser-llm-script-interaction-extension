@@ -40,10 +40,29 @@
 
         <div class="form-actions">
           <button id="test-connection" class="btn-secondary">Test Connection</button>
-          <button id="save-settings" class="btn-primary">Save Settings</button>
         </div>
 
         <div id="status-message" class="status-message"></div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Response Settings</h2>
+        <div class="form-group">
+          <label for="truncation-limit-input">Response Truncation Limit (characters):</label>
+          <input type="number" id="truncation-limit-input" min="100" step="100" placeholder="2000">
+          <p class="help-text">Maximum length of LLM responses before truncation. Helps prevent context overflow. Default: 2000 characters.</p>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Debug Settings</h2>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="debug-mode">
+            <span>Enable debug logging</span>
+          </label>
+          <p class="help-text">When enabled, detailed logs will appear in the browser console of pages where the extension is active.</p>
+        </div>
       </section>
 
       <section class="settings-section">

@@ -141,3 +141,21 @@ select:focus {
   border: 1px solid #bee5eb;
   display: block;
 }
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.help-text {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 4px;
+}

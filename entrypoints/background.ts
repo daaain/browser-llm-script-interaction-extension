@@ -1,11 +1,15 @@
 import browser from "webextension-polyfill";
+import { defineBackground } from "wxt/utils/define-background";
 import type {
   ChatMessage,
   ExtensionSettings,
   MessageFromSidebar,
   MessageToSidebar,
+  ContentScriptFunctionRequest,
+  ContentScriptFunctionResponse,
 } from "~/utils/types";
 import { DEFAULT_PROVIDERS } from "~/utils/types";
+import { DEFAULT_TRUNCATION_LIMIT } from "~/utils/constants";
 import { LLMService } from "~/utils/llm-service";
 
 let llmService: LLMService | null = null;
@@ -20,7 +24,27 @@ async function getSettings(): Promise<ExtensionSettings> {
 
     if (result.settings) {
       console.log("Found existing settings");
-      return result.settings as ExtensionSettings;
+      // Ensure required properties exist in existing settings
+      const settings = result.settings as ExtensionSettings;
+      let needsUpdate = false;
+      
+      if (typeof settings.debugMode === 'undefined') {
+        settings.debugMode = false;
+        needsUpdate = true;
+        console.log("Added missing debugMode to existing settings");
+      }
+      
+      if (typeof settings.truncationLimit === 'undefined') {
+        settings.truncationLimit = DEFAULT_TRUNCATION_LIMIT;
+        needsUpdate = true;
+        console.log("Added missing truncationLimit to existing settings");
+      }
+      
+      if (needsUpdate) {
+        await browser.storage.local.set({ settings });
+      }
+      
+      return settings;
     }
 
     console.log("No settings found, creating defaults");
@@ -30,6 +54,8 @@ async function getSettings(): Promise<ExtensionSettings> {
         apiKey: "",
       },
       chatHistory: [],
+      debugMode: false,
+      truncationLimit: DEFAULT_TRUNCATION_LIMIT,
     };
 
     await browser.storage.local.set({ settings: defaultSettings });
@@ -94,6 +120,83 @@ async function sendChatMessage(message: string): Promise<string> {
   return response.content;
 }
 
+async function executeContentScriptFunction(
+  functionName: string,
+  args: any
+): Promise<ContentScriptFunctionResponse> {
+  try {
+    // Get the active tab
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tabs.length === 0) {
+      return { success: false, error: "No active tab found" };
+    }
+
+    const activeTab = tabs[0];
+    if (!activeTab.id) {
+      return { success: false, error: "Active tab has no ID" };
+    }
+
+    // Send message to content script
+    const request: ContentScriptFunctionRequest = {
+      type: "EXECUTE_FUNCTION",
+      function: functionName,
+      arguments: args,
+    };
+
+    const response = await browser.tabs.sendMessage(activeTab.id, request);
+    const functionResponse = response as ContentScriptFunctionResponse;
+
+    // If the function executed successfully, save the result to chat history
+    if (functionResponse.success) {
+      await saveFunctionResultToChat(functionName, args, functionResponse.result);
+    }
+
+    return functionResponse;
+  } catch (error) {
+    console.error("Error executing content script function:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+async function saveFunctionResultToChat(
+  functionName: string,
+  args: any,
+  result: any
+): Promise<void> {
+  try {
+    const settings = await getSettings();
+    
+    // Create a user message for the function call
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: `LLMHelper.${functionName}(${Object.keys(args).length > 0 ? JSON.stringify(args) : ''})`,
+      timestamp: Date.now(),
+    };
+
+    // Create an assistant message with the result
+    const assistantMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: `**${functionName} Result:**\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``,
+      timestamp: Date.now(),
+    };
+
+    // Add both messages to chat history
+    const updatedHistory = [...settings.chatHistory, userMessage, assistantMessage];
+
+    await saveSettings({
+      ...settings,
+      chatHistory: updatedHistory,
+    });
+  } catch (error) {
+    console.error("Error saving function result to chat:", error);
+  }
+}
+
 export default defineBackground({
   persistent: true,
   main() {
@@ -153,6 +256,19 @@ export default defineBackground({
               const response: MessageToSidebar = {
                 type: "MESSAGE_RESPONSE",
                 payload: { content: responseContent },
+              };
+              sendResponse(response);
+              break;
+            }
+
+            case "EXECUTE_FUNCTION": {
+              const functionResponse = await executeContentScriptFunction(
+                msg.payload.function,
+                msg.payload.arguments
+              );
+              const response: MessageToSidebar = {
+                type: "FUNCTION_RESPONSE",
+                payload: functionResponse,
               };
               sendResponse(response);
               break;

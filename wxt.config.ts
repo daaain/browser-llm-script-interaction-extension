@@ -6,11 +6,16 @@ export default defineConfig({
   },
   vite: () => ({
     base: "./",
+    server: {
+      port: 3000,
+      open: "/test-page.html",
+    },
+    publicDir: "public",
   }),
   manifest: ({ browser }) => ({
     name: "LLM actions",
     description: "Create actions for any website using an LLM",
-    permissions: ["storage", ...(browser === "chrome" ? ["sidePanel"] : [])],
+    permissions: ["storage", "activeTab", "tabs", ...(browser === "chrome" ? ["sidePanel"] : [])],
     host_permissions: [
       "http://localhost:*/*",
       "https://api.openai.com/*",

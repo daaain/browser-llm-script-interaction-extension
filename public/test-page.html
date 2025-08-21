@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extension Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .content-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .hidden-content {
+            display: none;
+        }
+        .visible-content {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Browser Extension Test Page</h1>
+    <p>This page contains various elements for testing browser automation functionality.</p>
+
+    <div class="content-section">
+        <h2>Navigation Elements</h2>
+        <button id="download-btn">Download</button>
+        <button id="upload-btn">Upload File</button>
+        <button id="save-btn">Save Document</button>
+        <a href="#section1" class="nav-link">Go to Section 1</a>
+        <a href="#section2" class="nav-link">Go to Section 2</a>
+    </div>
+
+    <div class="content-section">
+        <h2>Form Elements</h2>
+        <label for="username">Username:</label>
+        <input type="text" id="username" placeholder="Enter your username">
+        
+        <label for="email">Email:</label>
+        <input type="email" id="email" placeholder="Enter your email">
+        
+        <label for="country">Country:</label>
+        <select id="country">
+            <option value="">Select a country</option>
+            <option value="us">United States</option>
+            <option value="uk">United Kingdom</option>
+            <option value="ca">Canada</option>
+            <option value="au">Australia</option>
+        </select>
+        
+        <label for="comments">Comments:</label>
+        <textarea id="comments" placeholder="Enter your comments here"></textarea>
+        
+        <button type="submit" id="submit-btn">Submit Form</button>
+    </div>
+
+    <div class="content-section" id="section1">
+        <h2>Document Library</h2>
+        <p>This section contains a list of documents for testing element finding and interaction.</p>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Document Name</th>
+                        <th>Type</th>
+                        <th>Date</th>
+                        <th>Size</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Invoice_2024_001.pdf</td>
+                        <td>Invoice</td>
+                        <td>2024-01-15</td>
+                        <td>245 KB</td>
+                        <td>
+                            <button class="download-doc">Download</button>
+                            <button class="view-doc">View</button>
+                            <button class="delete-doc">Delete</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Receipt_2024_002.pdf</td>
+                        <td>Receipt</td>
+                        <td>2024-01-20</td>
+                        <td>128 KB</td>
+                        <td>
+                            <button class="download-doc">Download</button>
+                            <button class="view-doc">View</button>
+                            <button class="delete-doc">Delete</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Report_Q1_2024.docx</td>
+                        <td>Report</td>
+                        <td>2024-03-31</td>
+                        <td>892 KB</td>
+                        <td>
+                            <button class="download-doc">Download</button>
+                            <button class="view-doc">View</button>
+                            <button class="delete-doc">Delete</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Invoice_2024_003.pdf</td>
+                        <td>Invoice</td>
+                        <td>2024-02-14</td>
+                        <td>301 KB</td>
+                        <td>
+                            <button class="download-doc">Download</button>
+                            <button class="view-doc">View</button>
+                            <button class="delete-doc">Delete</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="content-section" id="section2">
+        <h2>Interactive Elements</h2>
+        <p>Various interactive elements for testing automation scenarios.</p>
+        
+        <div>
+            <h3>Checkboxes and Radio Buttons</h3>
+            <label><input type="checkbox" name="features" value="feature1"> Feature 1</label><br>
+            <label><input type="checkbox" name="features" value="feature2"> Feature 2</label><br>
+            <label><input type="checkbox" name="features" value="feature3"> Feature 3</label><br>
+            
+            <h4>Priority Level:</h4>
+            <label><input type="radio" name="priority" value="low"> Low</label>
+            <label><input type="radio" name="priority" value="medium"> Medium</label>
+            <label><input type="radio" name="priority" value="high"> High</label>
+        </div>
+        
+        <div>
+            <h3>Dynamic Content</h3>
+            <button id="show-content">Show Hidden Content</button>
+            <button id="hide-content">Hide Content</button>
+            <div id="dynamic-content" class="hidden-content">
+                <p>This content was dynamically shown. It contains important information that might need to be extracted.</p>
+                <button class="dynamic-action">Dynamic Action Button</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <h2>Text Content for Extraction</h2>
+        <p class="visible-content">This is visible text that should be easily extractable by the LLMHelper interface.</p>
+        <p class="visible-content">Another paragraph with important information: Product ID 12345, Status: Active, Last Updated: 2024-08-20</p>
+        
+        <div class="data-attributes" data-product-id="67890" data-status="pending" data-category="electronics">
+            <span>Product with data attributes</span>
+        </div>
+    </div>
+
+    <script>
+        // Simple interactions for testing
+        document.getElementById('show-content').addEventListener('click', function() {
+            document.getElementById('dynamic-content').classList.remove('hidden-content');
+        });
+        
+        document.getElementById('hide-content').addEventListener('click', function() {
+            document.getElementById('dynamic-content').classList.add('hidden-content');
+        });
+        
+        // Add click handlers for document actions
+        document.querySelectorAll('.download-doc').forEach(btn => {
+            btn.addEventListener('click', function() {
+                alert('Download initiated for: ' + this.closest('tr').querySelector('td').textContent);
+            });
+        });
+        
+        document.querySelectorAll('.view-doc').forEach(btn => {
+            btn.addEventListener('click', function() {
+                alert('Viewing: ' + this.closest('tr').querySelector('td').textContent);
+            });
+        });
+        
+        document.querySelectorAll('.delete-doc').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (confirm('Delete: ' + this.closest('tr').querySelector('td').textContent + '?')) {
+                    this.closest('tr').remove();
+                }
+            });
+        });
+        
+        // Form submission handler
+        document.getElementById('submit-btn').addEventListener('click', function() {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const country = document.getElementById('country').value;
+            const comments = document.getElementById('comments').value;
+            
+            alert(`Form submitted:\nUsername: ${username}\nEmail: ${email}\nCountry: ${country}\nComments: ${comments}`);
+        });
+    </script>
+</body>
+</html>

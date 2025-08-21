@@ -20,16 +20,30 @@ export interface LLMResponse {
 export interface ExtensionSettings {
   provider: LLMProvider;
   chatHistory: ChatMessage[];
+  debugMode: boolean;
+  truncationLimit: number;
 }
 
 export interface MessageFromSidebar {
-  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS";
+  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS" | "EXECUTE_FUNCTION";
   payload: any;
 }
 
 export interface MessageToSidebar {
-  type: "MESSAGE_RESPONSE" | "SETTINGS_RESPONSE" | "ERROR";
+  type: "MESSAGE_RESPONSE" | "SETTINGS_RESPONSE" | "ERROR" | "FUNCTION_RESPONSE";
   payload: any;
+}
+
+export interface ContentScriptFunctionRequest {
+  type: "EXECUTE_FUNCTION";
+  function: string;
+  arguments: any;
+}
+
+export interface ContentScriptFunctionResponse {
+  success: boolean;
+  result?: any;
+  error?: string;
 }
 
 export const DEFAULT_PROVIDERS: Omit<LLMProvider, "apiKey">[] = [
