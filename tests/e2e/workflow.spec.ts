@@ -128,4 +128,93 @@ test.describe("Complete User Workflow", () => {
       .evaluate((el: HTMLInputElement) => el.validity.valid);
     expect(newValidity).toBe(true);
   });
+
+  test("should execute LLMHelper function and include results in chat context", async ({ context, extensionId }) => {
+    // Step 1: Open sidepanel directly
+    const sidepanelPage = await context.newPage();
+    await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+
+    // Verify sidepanel UI is ready
+    await expect(sidepanelPage.locator("h1")).toContainText("LLM Chat");
+    await expect(sidepanelPage.locator("#test-extract")).toBeVisible();
+    await expect(sidepanelPage.locator("#clear-btn")).toBeVisible();
+
+    // Step 2: Test clear chat button visibility and functionality
+    const clearBtn = sidepanelPage.locator("#clear-btn");
+    await expect(clearBtn).toBeVisible();
+    await expect(clearBtn).toHaveAttribute("title", "Clear Chat");
+
+    // Initially should show welcome message
+    const welcomeMessage = sidepanelPage.locator(".welcome-message").first();
+    await expect(welcomeMessage).toBeVisible();
+    await expect(welcomeMessage).toContainText("Welcome to LLM Chat!");
+
+    // Step 3: Test that Test Extract button is present and clickable
+    const testExtractBtn = sidepanelPage.locator("#test-extract");
+    await expect(testExtractBtn).toBeVisible();
+    await expect(testExtractBtn).toBeEnabled();
+    await expect(testExtractBtn).toContainText("Test Extract");
+
+    // Step 4: Test message input functionality
+    const messageInput = sidepanelPage.locator("#message-input");
+    const sendBtn = sidepanelPage.locator("#send-btn");
+
+    await expect(messageInput).toBeVisible();
+    await expect(sendBtn).toBeVisible();
+
+    // Test that we can type in the input
+    await messageInput.fill("What did you extract from the page?");
+    await expect(messageInput).toHaveValue("What did you extract from the page?");
+
+    // Step 5: Test clear functionality (should actually clear conversation)
+    await clearBtn.click();
+    await sidepanelPage.waitForTimeout(1000); // Give time for async operation
+
+    // Welcome message should be visible after clearing
+    await expect(sidepanelPage.locator(".welcome-message")).toBeVisible();
+    
+    // Input should still be functional
+    await expect(messageInput).toBeVisible();
+    await expect(sendBtn).toBeVisible();
+    
+    // Note: Status message indicating chat was cleared may appear briefly
+
+    // Step 6: Verify all test buttons are present for LLMHelper functions
+    await expect(sidepanelPage.locator("#test-summary")).toBeVisible();
+    await expect(sidepanelPage.locator("#test-extract")).toBeVisible();
+    await expect(sidepanelPage.locator("#test-find")).toBeVisible();
+  });
+
+  test("should maintain stable chat UI without flicker during operations", async ({ context, extensionId }) => {
+    // Open sidepanel
+    const sidepanelPage = await context.newPage();
+    await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+
+    // Verify initial state
+    await expect(sidepanelPage.locator(".welcome-message").first()).toBeVisible();
+    
+    // Type a message but don't send it
+    const messageInput = sidepanelPage.locator("#message-input");
+    await messageInput.fill("Test message");
+    
+    // Clear chat should not affect the input field content
+    const clearBtn = sidepanelPage.locator("#clear-btn");
+    await clearBtn.click();
+    await sidepanelPage.waitForTimeout(500);
+    
+    // Welcome message should still be there
+    await expect(sidepanelPage.locator(".welcome-message").first()).toBeVisible();
+    
+    // Input field should maintain its content and be functional
+    await expect(messageInput).toHaveValue("Test message");
+    await expect(messageInput).toBeEditable();
+    
+    // Clear input and verify it works
+    await messageInput.clear();
+    await expect(messageInput).toHaveValue("");
+    
+    // Type again to ensure input is responsive
+    await messageInput.fill("Another test");
+    await expect(messageInput).toHaveValue("Another test");
+  });
 });

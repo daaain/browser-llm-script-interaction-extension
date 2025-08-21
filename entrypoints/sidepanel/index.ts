@@ -12,6 +12,9 @@ class ChatInterface {
   private messageInput: HTMLTextAreaElement;
   private sendButton: HTMLButtonElement;
   private statusElement: HTMLElement;
+  private tabId: number | null = null;
+  private lastDisplayedHistoryLength: number = 0;
+  private isRefreshing: boolean = false;
 
   constructor() {
     this.messagesContainer = document.getElementById("messages")!;
@@ -23,10 +26,17 @@ class ChatInterface {
   }
 
   private async init() {
+    await this.getCurrentTab();
     await this.loadSettings();
     this.setupEventListeners();
+    
+    // Initialize tracking
+    const currentHistory = this.getTabChatHistory(this.currentSettings);
+    this.lastDisplayedHistoryLength = currentHistory.length;
+    
     this.displayChatHistory();
     this.setupStorageListener();
+    this.setupTabChangeListener();
   }
 
   private async loadSettings() {
@@ -62,21 +72,34 @@ class ChatInterface {
       browser.runtime.openOptionsPage();
     });
 
+    const clearBtn = document.getElementById("clear-btn")!;
+    clearBtn.addEventListener("click", () => {
+      this.clearChat();
+    });
+
     // Add test button handlers
     this.setupTestButtons();
   }
 
   private displayChatHistory() {
-    if (!this.currentSettings || this.currentSettings.chatHistory.length === 0) {
+    const tabHistory = this.getTabChatHistory(this.currentSettings);
+    
+    if (tabHistory.length === 0) {
+      // Only show welcome message if one doesn't already exist
+      const existingWelcome = this.messagesContainer.querySelector('.welcome-message');
+      if (!existingWelcome) {
+        this.showWelcomeMessage();
+      }
       return;
     }
 
-    const welcomeMessage = this.messagesContainer.querySelector(".welcome-message");
+    // Remove welcome message when we have chat history
+    const welcomeMessage = this.messagesContainer.querySelector('.welcome-message');
     if (welcomeMessage) {
       welcomeMessage.remove();
     }
 
-    this.currentSettings.chatHistory.forEach((message) => {
+    tabHistory.forEach((message) => {
       this.addMessageToUI(message);
     });
 
@@ -106,33 +129,17 @@ class ChatInterface {
       welcomeMessage.remove();
     }
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: messageText,
-      timestamp: Date.now(),
-    };
-
-    this.addMessageToUI(userMessage);
-
     const message: MessageFromSidebar = {
       type: "SEND_MESSAGE",
-      payload: { message: messageText },
+      payload: { message: messageText, tabId: this.tabId },
     };
 
     try {
       const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
 
       if (response.type === "MESSAGE_RESPONSE") {
-        const assistantMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: response.payload.content,
-          timestamp: Date.now(),
-        };
-
-        this.addMessageToUI(assistantMessage);
         this.showStatus("");
+        // Messages will be displayed via storage listener - no need to add directly
       } else if (response.type === "ERROR") {
         this.showStatus(`Error: ${response.payload.error}`, "error");
       }
@@ -232,13 +239,26 @@ class ChatInterface {
   private setupStorageListener() {
     // Listen for storage changes to update chat history when LLMHelper functions are executed
     browser.storage.onChanged.addListener((changes, areaName) => {
+      if (this.isRefreshing) return; // Prevent recursive updates
+      
       if (areaName === 'local' && changes.settings && changes.settings.newValue) {
         const newSettings = changes.settings.newValue as ExtensionSettings;
-        const oldSettings = changes.settings.oldValue as ExtensionSettings;
         
-        // Check if chat history has been updated
-        if (newSettings.chatHistory.length > (oldSettings?.chatHistory?.length || 0)) {
-          // Update current settings and refresh chat display
+        // Get the current tab's chat history
+        const currentTabHistory = this.getTabChatHistory(newSettings);
+        
+        // Only update if there are actually new messages
+        if (currentTabHistory.length > this.lastDisplayedHistoryLength) {
+          // Update current settings
+          this.currentSettings = newSettings;
+          
+          // Add only the new messages to avoid flicker
+          const newMessages = currentTabHistory.slice(this.lastDisplayedHistoryLength);
+          this.addNewMessagesToUI(newMessages);
+          
+          this.lastDisplayedHistoryLength = currentTabHistory.length;
+        } else if (currentTabHistory.length < this.lastDisplayedHistoryLength) {
+          // History was cleared or reduced, do a full refresh
           this.currentSettings = newSettings;
           this.refreshChatDisplay();
         }
@@ -246,18 +266,150 @@ class ChatInterface {
     });
   }
 
-  private refreshChatDisplay() {
-    // Clear current messages and redisplay the updated history
-    const messages = this.messagesContainer.querySelectorAll('.message');
-    messages.forEach(msg => msg.remove());
-    
-    // Remove welcome message if it exists
-    const welcomeMessage = this.messagesContainer.querySelector(".welcome-message");
+  private addNewMessagesToUI(messages: ChatMessage[]): void {
+    // Remove welcome message if present
+    const welcomeMessage = this.messagesContainer.querySelector('.welcome-message');
     if (welcomeMessage) {
       welcomeMessage.remove();
     }
     
+    // Add new messages
+    messages.forEach((message) => {
+      this.addMessageToUI(message);
+    });
+  }
+
+  private refreshChatDisplay() {
+    this.isRefreshing = true;
+    
+    // Clear current messages and redisplay the updated history
+    this.clearUIMessages();
+    
     this.displayChatHistory();
+    
+    // Update our tracking
+    const currentHistory = this.getTabChatHistory(this.currentSettings);
+    this.lastDisplayedHistoryLength = currentHistory.length;
+    
+    this.isRefreshing = false;
+  }
+
+  private async getCurrentTab(): Promise<void> {
+    try {
+      const tabs = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+      this.tabId = tabs[0]?.id || null;
+      
+      // If we can't get the tab ID, try using a fallback approach
+      if (!this.tabId) {
+        // Use a default tab ID for testing or when tab info isn't available
+        this.tabId = 1;
+        console.warn('Could not get current tab ID, using fallback');
+      }
+    } catch (error) {
+      console.error('Error getting current tab:', error);
+      // Fallback to a default tab ID
+      this.tabId = 1;
+    }
+  }
+
+  private getTabChatHistory(settings: ExtensionSettings | null): ChatMessage[] {
+    if (!settings) {
+      return [];
+    }
+    
+    if (!this.tabId) {
+      return settings.chatHistory || [];
+    }
+    
+    // Return tab-specific conversation or empty array for new tabs
+    return settings.tabConversations?.[this.tabId.toString()] || [];
+  }
+
+  private async clearChat(): Promise<void> {
+    if (!this.currentSettings) return;
+    
+    // Ensure we have a tab ID
+    if (!this.tabId) {
+      await this.getCurrentTab();
+    }
+    
+    if (!this.tabId) {
+      this.showStatus('Cannot clear chat: no tab information', 'error');
+      return;
+    }
+
+    try {
+      // Actually clear the conversation history for this tab
+      const message: MessageFromSidebar = {
+        type: "CLEAR_TAB_CONVERSATION",
+        payload: { tabId: this.tabId },
+      };
+
+      const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
+      
+      if (response.type === "SETTINGS_RESPONSE") {
+        // Update our local settings
+        this.currentSettings = response.payload;
+        this.lastDisplayedHistoryLength = 0;
+        
+        // Clear UI immediately
+        this.clearUIMessages();
+        this.showWelcomeMessage();
+        
+        this.showStatus('Chat cleared', '');
+        setTimeout(() => this.showStatus('', ''), 2000);
+      }
+    } catch (error) {
+      console.error('Error clearing chat:', error);
+      this.showStatus('Error clearing chat', 'error');
+    }
+  }
+
+  private clearUIMessages(): void {
+    const messages = this.messagesContainer.querySelectorAll('.message');
+    messages.forEach(msg => msg.remove());
+    
+    const existingWelcome = this.messagesContainer.querySelector('.welcome-message');
+    if (existingWelcome) {
+      existingWelcome.remove();
+    }
+  }
+
+  private showWelcomeMessage(): void {
+    // Check if welcome message already exists
+    const existingWelcome = this.messagesContainer.querySelector('.welcome-message');
+    if (existingWelcome) {
+      return; // Don't add duplicate
+    }
+    
+    const welcomeMessage = document.createElement('div');
+    welcomeMessage.className = 'welcome-message';
+    welcomeMessage.innerHTML = `
+      <h3>Welcome to LLM Chat!</h3>
+      <p>Start a conversation with your configured LLM. Make sure to configure your settings first.</p>
+    `;
+    this.messagesContainer.appendChild(welcomeMessage);
+  }
+
+  private setupTabChangeListener(): void {
+    // Listen for active tab changes to update conversation context
+    if (browser.tabs && browser.tabs.onActivated) {
+      browser.tabs.onActivated.addListener(async (activeInfo) => {
+        const previousTabId = this.tabId;
+        this.tabId = activeInfo.tabId;
+        
+        // Only refresh if the tab actually changed
+        if (previousTabId !== this.tabId) {
+          await this.loadSettings(); // Reload settings to get latest data
+          
+          // Reset tracking for new tab
+          this.lastDisplayedHistoryLength = 0;
+          
+          // Refresh display for new tab context
+          this.refreshChatDisplay();
+        }
+      });
+    }
   }
 
   private addTestResult(functionName: string, result: any) {

@@ -80,7 +80,7 @@ async function saveSettings(settings: ExtensionSettings): Promise<void> {
   }
 }
 
-async function sendChatMessage(message: string): Promise<string> {
+async function sendChatMessage(message: string, tabId?: number): Promise<string> {
   if (!llmService) {
     const settings = await getSettings();
     llmService = new LLMService(settings.provider);
@@ -95,7 +95,12 @@ async function sendChatMessage(message: string): Promise<string> {
     timestamp: Date.now(),
   };
 
-  const messagesForAPI = [...settings.chatHistory, newMessage];
+  // Get conversation history for this tab or use global if no tabId
+  const conversationHistory = tabId 
+    ? (settings.tabConversations?.[tabId.toString()] || [])
+    : settings.chatHistory;
+
+  const messagesForAPI = [...conversationHistory, newMessage];
 
   const response = await llmService.sendMessage(messagesForAPI);
 
@@ -110,12 +115,23 @@ async function sendChatMessage(message: string): Promise<string> {
     timestamp: Date.now(),
   };
 
-  const updatedHistory = [...messagesForAPI, assistantMessage];
+  const updatedConversation = [...messagesForAPI, assistantMessage];
 
-  await saveSettings({
-    ...settings,
-    chatHistory: updatedHistory,
-  });
+  // Save to appropriate conversation history
+  if (tabId) {
+    const tabConversations = settings.tabConversations || {};
+    tabConversations[tabId.toString()] = updatedConversation;
+    
+    await saveSettings({
+      ...settings,
+      tabConversations,
+    });
+  } else {
+    await saveSettings({
+      ...settings,
+      chatHistory: updatedConversation,
+    });
+  }
 
   return response.content;
 }
@@ -169,6 +185,10 @@ async function saveFunctionResultToChat(
   try {
     const settings = await getSettings();
     
+    // Get the active tab to save to the correct conversation
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const activeTabId = tabs[0]?.id;
+    
     // Create a user message for the function call
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -185,15 +205,53 @@ async function saveFunctionResultToChat(
       timestamp: Date.now(),
     };
 
-    // Add both messages to chat history
-    const updatedHistory = [...settings.chatHistory, userMessage, assistantMessage];
-
-    await saveSettings({
-      ...settings,
-      chatHistory: updatedHistory,
-    });
+    // Save to appropriate conversation history
+    if (activeTabId) {
+      const tabConversations = settings.tabConversations || {};
+      const currentTabHistory = tabConversations[activeTabId.toString()] || [];
+      const updatedTabHistory = [...currentTabHistory, userMessage, assistantMessage];
+      
+      tabConversations[activeTabId.toString()] = updatedTabHistory;
+      
+      await saveSettings({
+        ...settings,
+        tabConversations,
+      });
+    } else {
+      // Fallback to global history if no active tab
+      const updatedHistory = [...settings.chatHistory, userMessage, assistantMessage];
+      await saveSettings({
+        ...settings,
+        chatHistory: updatedHistory,
+      });
+    }
   } catch (error) {
     console.error("Error saving function result to chat:", error);
+  }
+}
+
+async function clearTabConversation(tabId: number): Promise<ExtensionSettings> {
+  try {
+    const settings = await getSettings();
+    
+    // Clear the conversation for the specific tab
+    if (settings.tabConversations && settings.tabConversations[tabId.toString()]) {
+      delete settings.tabConversations[tabId.toString()];
+    }
+    
+    // Also clear global history if this was the active tab
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const activeTabId = tabs[0]?.id;
+    
+    if (activeTabId === tabId) {
+      settings.chatHistory = [];
+    }
+    
+    await saveSettings(settings);
+    return settings;
+  } catch (error) {
+    console.error('Error clearing tab conversation:', error);
+    throw error;
   }
 }
 
@@ -252,7 +310,7 @@ export default defineBackground({
             }
 
             case "SEND_MESSAGE": {
-              const responseContent = await sendChatMessage(msg.payload.message);
+              const responseContent = await sendChatMessage(msg.payload.message, msg.payload.tabId);
               const response: MessageToSidebar = {
                 type: "MESSAGE_RESPONSE",
                 payload: { content: responseContent },
@@ -269,6 +327,16 @@ export default defineBackground({
               const response: MessageToSidebar = {
                 type: "FUNCTION_RESPONSE",
                 payload: functionResponse,
+              };
+              sendResponse(response);
+              break;
+            }
+
+            case "CLEAR_TAB_CONVERSATION": {
+              const updatedSettings = await clearTabConversation(msg.payload.tabId);
+              const response: MessageToSidebar = {
+                type: "SETTINGS_RESPONSE",
+                payload: updatedSettings,
               };
               sendResponse(response);
               break;

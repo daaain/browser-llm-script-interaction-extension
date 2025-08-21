@@ -22,10 +22,11 @@ export interface ExtensionSettings {
   chatHistory: ChatMessage[];
   debugMode: boolean;
   truncationLimit: number;
+  tabConversations?: { [tabId: string]: ChatMessage[] };
 }
 
 export interface MessageFromSidebar {
-  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS" | "EXECUTE_FUNCTION";
+  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS" | "EXECUTE_FUNCTION" | "CLEAR_TAB_CONVERSATION";
   payload: any;
 }
 
