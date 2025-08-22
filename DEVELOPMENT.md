@@ -146,13 +146,16 @@ pnpm test llm-service.test.ts
 
 ```bash
 # Run E2E tests (requires built extension)
-pnpm test:e2e
+pnpm build && pnpm test:e2e
 
 # Run E2E tests with UI
 pnpm test:e2e --ui
 
 # Run E2E tests for specific browser
 pnpm test:e2e --project=chrome
+
+# Run just the test which does real LLM API calls (and captures JSON responses):
+pnpm test:e2e tests/e2e/manual-streaming-test.spec.ts
 ```
 
 ### Linting and Formatting

@@ -11,3 +11,5 @@ Roadmap / TODO:
 - tool parameters to choose number of items / length to return, paging, and reporting how much there is
 - replace function test buttons with full list of functions and way to manually call any of them
 - tutorial / welcome screen
+- handle text selection - add to context with little popup? that could also trigger opening the sidebar?
+- maybe also right click context menu element selection for interaction?

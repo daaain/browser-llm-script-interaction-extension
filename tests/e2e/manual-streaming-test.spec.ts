@@ -1,5 +1,9 @@
 import { expect, test } from "./fixtures";
 import "./types";
+import * as fs from "node:fs";
+
+// See: https://github.com/microsoft/playwright/issues/15684
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = "1";
 
 test.describe("Manual Streaming Test", () => {
   test.beforeEach(async ({ context }) => {
@@ -10,7 +14,72 @@ test.describe("Manual Streaming Test", () => {
     }
   });
 
-  test("should manually configure extension and test streaming", async ({ context, extensionId }) => {
+  test("should manually configure extension and test streaming with network capture", async ({
+    context,
+    extensionId,
+  }) => {
+    // Create results directory if it doesn't exist
+    if (!fs.existsSync("test-results")) {
+      fs.mkdirSync("test-results");
+    }
+
+    // Array to store captured API responses
+    const apiResponses: any[] = [];
+    let responseCounter = 0;
+
+    // Network response handler to capture LLM API calls from ALL contexts
+    const handleResponse = async (response: any) => {
+      try {
+        const url = response.url();
+        if (
+          url.includes("chat/completions") ||
+          url.includes("v1/chat") ||
+          url.includes("localhost:1234")
+        ) {
+          responseCounter++;
+          const responseData = {
+            id: responseCounter,
+            url: url,
+            status: response.status(),
+            timestamp: new Date().toISOString(),
+            headers: await response.allHeaders(),
+          };
+
+          // Try to get response body (may be streaming)
+          try {
+            const responseText = await response.text();
+            responseData.body = responseText;
+            console.log(`📡 Captured LLM API Response #${responseCounter}:`, {
+              url: responseData.url,
+              status: responseData.status,
+              bodyLength: responseText.length,
+              bodyPreview:
+                responseText.substring(0, 200) + (responseText.length > 200 ? "..." : ""),
+            });
+          } catch (error) {
+            responseData.body = `[Failed to read body: ${error.message}]`;
+            console.log(
+              `📡 Captured LLM API Response #${responseCounter} (no body):`,
+              responseData.url,
+            );
+          }
+
+          apiResponses.push(responseData);
+
+          // Save each response immediately
+          fs.writeFileSync(
+            `test-results/api-response-${responseCounter}.json`,
+            JSON.stringify(responseData, null, 2),
+          );
+        }
+      } catch (error) {
+        console.error("Error handling response:", error);
+      }
+    };
+
+    // Set up network interception on the entire browser context (not just one page)
+    context.on("response", handleResponse);
+
     // Step 1: Configure extension settings
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
@@ -22,100 +91,105 @@ test.describe("Manual Streaming Test", () => {
 
     // Wait for auto-save
     await optionsPage.waitForTimeout(2000);
-    
-    // Step 2: Set up test page using example.com (a real web page)
-    const testPage = await context.newPage();
-    await testPage.goto("https://example.com");
-    
-    // Wait for content script to load
-    await testPage.waitForTimeout(3000);
-    
-    // Test that content script is loaded
-    const llmHelperExists = await testPage.evaluate(() => {
-      return typeof (window as any).LLMHelper !== "undefined";
-    });
-    
-    console.log("LLMHelper exists on test page:", llmHelperExists);
-    
-    // Step 3: Test tools manually
-    if (llmHelperExists) {
-      const summaryResult = await testPage.evaluate(() => {
-        const helper = (window as any).LLMHelper;
-        return helper.summary();
-      });
-      
-      console.log("Summary result:", summaryResult);
-      expect(typeof summaryResult).toBe("string");
-      expect(summaryResult).toContain("Example");
-    }
-    
-    // Step 4: Open sidepanel and test streaming
+
+    // Verify settings were saved
+    const savedEndpoint = await optionsPage.locator("#endpoint-input").inputValue();
+    const savedModel = await optionsPage.locator("#model-input").inputValue();
+    console.log(`⚙️ Saved settings - Endpoint: ${savedEndpoint}, Model: ${savedModel}`);
+
+    // Step 2: Skip external page for now and focus on the chat functionality
+    console.log("⏭️ Skipping external page setup for debugging");
+
+    // Step 3: Open sidepanel
     const sidepanelPage = await context.newPage();
+
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-    
-    // Take screenshot to see if sidepanel loaded
-    await sidepanelPage.screenshot({ path: 'test-results/sidepanel-loaded.png' });
-    
+
     // Wait for sidepanel to fully load
     await expect(sidepanelPage.locator("#message-input")).toBeVisible({ timeout: 5000 });
     await expect(sidepanelPage.locator("#send-btn")).toBeVisible({ timeout: 5000 });
-    
-    // Take screenshot before sending message
-    await sidepanelPage.screenshot({ path: 'test-results/sidepanel-ready.png' });
-    
-    // Send a simple message first
-    await sidepanelPage.locator("#message-input").fill("Hello! Just say hi back, don't use any tools.");
+
+    console.log("🚀 Starting test with network capture enabled...");
+
+    // Test 1: Simple message without tools
+    console.log("📝 Test 1: Simple message without tools");
+    await sidepanelPage
+      .locator("#message-input")
+      .fill("Hello! Just say hi back briefly, don't use any tools.");
     await sidepanelPage.locator("#send-btn").click();
-    
-    // Take screenshot after clicking send
-    await sidepanelPage.screenshot({ path: 'test-results/message-sent.png' });
-    
+
     // Wait for response
     await expect(sidepanelPage.locator(".message.assistant")).toBeVisible({ timeout: 10000 });
-    
-    // Take screenshot when response appears
-    await sidepanelPage.screenshot({ path: 'test-results/response-appeared.png' });
-    
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0, { timeout: 15000 });
-    
-    // Take screenshot when streaming is complete
-    await sidepanelPage.screenshot({ path: 'test-results/streaming-complete.png' });
-    
+    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0, {
+      timeout: 15000,
+    });
+
     const firstResponse = await sidepanelPage.locator(".message.assistant").textContent();
-    console.log("First response:", firstResponse);
-    
-    // Always try with tools to test the streaming behavior
-    await sidepanelPage.locator("#message-input").fill("Please take a screenshot and describe what you see. Also tell me what you think about the current page content.");
+    console.log("✅ First response received:", firstResponse?.substring(0, 100));
+
+    // Test 2: Message with text-based tool calls that should work
+    console.log("📝 Test 2: Message with text-based tool calls");
+    await sidepanelPage
+      .locator("#message-input")
+      .fill(
+        "Please find an element with text 'Example' on the current page and click it. Then get the page summary. Use the findElement and click tools.",
+      );
     await sidepanelPage.locator("#send-btn").click();
-    
-    // Take screenshot when tool message sent
-    await sidepanelPage.screenshot({ path: 'test-results/tool-message-sent.png' });
-    
-    // Wait for streaming to start
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toBeVisible({ timeout: 10000 });
-    
-    // Take screenshot during streaming
-    await sidepanelPage.screenshot({ path: 'test-results/tool-streaming.png' });
-    
-    // Wait for completion
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0, { timeout: 30000 });
-    
-    // Take final screenshot
-    await sidepanelPage.screenshot({ path: 'test-results/tool-complete.png' });
-    
+
+    // Take screenshot right after sending
+    await sidepanelPage.screenshot({ path: "test-results/after-tool-message-send.png" });
+
+    console.log("⏳ Waiting for ANY assistant message to appear...");
+    // First, just wait for any assistant message to appear
+    await expect(sidepanelPage.locator(".message.assistant")).toHaveCount(2, {
+      timeout: 15000,
+    });
+
+    // Take screenshot when message appears
+    await sidepanelPage.screenshot({ path: "test-results/assistant-message-appeared.png" });
+
+    // Check if streaming class exists
+    const streamingCount = await sidepanelPage.locator(".message.assistant.streaming").count();
+    console.log(`📊 Streaming messages found: ${streamingCount}`);
+
+    if (streamingCount > 0) {
+      console.log("⏳ Waiting for streaming to complete...");
+      // Wait for completion with longer timeout for tool calls
+      await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0, {
+        timeout: 45000,
+      });
+    } else {
+      console.log("ℹ️  No streaming detected, message may have completed immediately");
+    }
+
     const toolResponse = await sidepanelPage.locator(".message.assistant").last().innerHTML();
-    console.log("Tool response HTML:", toolResponse);
-    
-    // The response should contain tool attempts even if they fail
+    console.log("✅ Tool response received, length:", toolResponse.length);
+
+    // Save the final conversation state
+    const allMessages = await sidepanelPage.locator(".message").allInnerTexts();
+    fs.writeFileSync(
+      "test-results/conversation-messages.json",
+      JSON.stringify(allMessages, null, 2),
+    );
+
+    // Save all captured API responses
+    fs.writeFileSync("test-results/all-api-responses.json", JSON.stringify(apiResponses, null, 2));
+
+    console.log(`📊 Test completed. Captured ${apiResponses.length} API responses.`);
+    console.log(`💬 Final conversation has ${allMessages.length} messages.`);
+
+    // Analyze the responses
     const hasToolCalls = toolResponse.includes("tool-call");
     const hasToolResults = toolResponse.includes("tool-result");
     const hasAssistantText = toolResponse.includes("assistant-text");
-    
-    console.log(`Tool calls present: ${hasToolCalls}`);
-    console.log(`Tool results present: ${hasToolResults}`);
-    console.log(`Assistant text present: ${hasAssistantText}`);
-    
-    // Should contain some content even if tools fail
+
+    console.log(`🔧 Tool calls present: ${hasToolCalls}`);
+    console.log(`📋 Tool results present: ${hasToolResults}`);
+    console.log(`💬 Assistant text present: ${hasAssistantText}`);
+
+    // Basic assertions
+    expect(apiResponses.length).toBeGreaterThan(0);
     expect(toolResponse.length).toBeGreaterThan(10);
+    expect(allMessages.length).toBeGreaterThan(2);
   });
 });

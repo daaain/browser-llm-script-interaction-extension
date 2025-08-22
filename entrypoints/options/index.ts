@@ -18,7 +18,7 @@ class SettingsManager {
   }
 
   private async loadSettings() {
-    console.log("Loading settings...");
+    console.debug("Loading settings...");
 
     const message: MessageFromSidebar = {
       type: "GET_SETTINGS",
@@ -27,12 +27,12 @@ class SettingsManager {
 
     try {
       const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
-      console.log("Settings response:", response);
+      console.debug("Settings response:", JSON.stringify(response));
 
       if (response.type === "SETTINGS_RESPONSE") {
         this.currentSettings = response.payload;
         this.populateForm();
-        console.log("Settings loaded successfully");
+        console.debug("Settings loaded successfully");
       }
     } catch (error) {
       console.error("Error loading settings:", error);

@@ -35,7 +35,6 @@ test.describe("Streaming Functionality", () => {
     expect(streamingCSSExists).toBe(true);
   });
 
-
   test("should stream text with real LLM API and tool calls", async ({ context, extensionId }) => {
     // First configure the extension
     const optionsPage = await context.newPage();

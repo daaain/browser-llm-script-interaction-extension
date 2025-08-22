@@ -4,3 +4,4 @@ playwright-report/*
 test-results/*
 .output
 .wxt
+vercel-ai-llms.txt

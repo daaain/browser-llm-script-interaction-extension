@@ -77,6 +77,6 @@ export default defineContentScript({
       return true; // Keep the message channel open for async responses
     });
 
-    console.log("LLMHelper content script loaded");
+    console.debug("LLMHelper content script loaded");
   },
 });
