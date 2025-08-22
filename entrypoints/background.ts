@@ -43,7 +43,7 @@ async function getSettings(): Promise<ExtensionSettings> {
       }
       
       if (typeof settings.toolsEnabled === 'undefined') {
-        settings.toolsEnabled = false;
+        settings.toolsEnabled = true;
         needsUpdate = true;
         console.log("Added missing toolsEnabled to existing settings");
       }
@@ -64,7 +64,7 @@ async function getSettings(): Promise<ExtensionSettings> {
       chatHistory: [],
       debugMode: false,
       truncationLimit: DEFAULT_TRUNCATION_LIMIT,
-      toolsEnabled: false,
+      toolsEnabled: true,
     };
 
     await browser.storage.local.set({ settings: defaultSettings });
@@ -210,10 +210,24 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
     for (const toolCall of response.tool_calls) {
       try {
         const toolResult = await executeToolCall(toolCall);
-        toolResults.push({
-          id: toolCall.id,
-          result: toolResult.result
-        });
+        
+        // Special handling for screenshot results
+        if (toolCall.function.name === 'screenshot' && typeof toolResult.result === 'string' && toolResult.result.startsWith('data:image/')) {
+          // For screenshots, we want to store the image for both display and LLM analysis
+          toolResults.push({
+            id: toolCall.id,
+            result: {
+              type: 'screenshot',
+              dataUrl: toolResult.result,
+              description: 'Screenshot captured successfully'
+            }
+          });
+        } else {
+          toolResults.push({
+            id: toolCall.id,
+            result: toolResult.result
+          });
+        }
         
         console.log(`Tool call ${toolCall.function.name} executed successfully`);
       } catch (error) {
@@ -247,13 +261,51 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
     
     // Build conversation for final LLM call (including tool results as separate messages)
     const conversationForFinalCall = [...messagesForAPI, streamingMessage];
+    
+    // Check if there are any screenshot results
+    const screenshotResults = toolResults.filter(tr => 
+      tr.result && 
+      typeof tr.result === 'object' && 
+      tr.result.type === 'screenshot' && 
+      tr.result.dataUrl
+    );
+    
+    // Add regular tool results as text-only tool messages
     for (const toolResult of toolResults) {
       conversationForFinalCall.push({
         id: `tool-${toolResult.id}`,
         role: "tool" as const,
-        content: toolResult.error ? `Error: ${toolResult.error}` : JSON.stringify(toolResult.result),
+        content: toolResult.error ? `Error: ${toolResult.error}` : 
+                 (toolResult.result?.type === 'screenshot' ? 'Screenshot captured successfully' : JSON.stringify(toolResult.result)),
         timestamp: Date.now(),
         tool_call_id: toolResult.id,
+      });
+    }
+    
+    // If there are screenshots, add them as a follow-up user message with images
+    if (screenshotResults.length > 0) {
+      const imageContent: Array<{
+        type: "text" | "input_image";
+        text?: string;
+        image_url?: { url: string };
+      }> = [
+        {
+          type: "text" as const,
+          text: "Here is the screenshot:"
+        },
+        ...screenshotResults.map(sr => ({
+          type: "input_image" as const,
+          image_url: {
+            url: sr.result.dataUrl
+          }
+        }))
+      ];
+      
+      conversationForFinalCall.push({
+        id: `screenshot-analysis-${Date.now()}`,
+        role: "user" as const,
+        content: imageContent,
+        timestamp: Date.now(),
       });
     }
     
@@ -332,7 +384,7 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
     }
   }
 
-  return response.content;
+  return typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 }
 
 async function executeToolCall(toolCall: LLMToolCall): Promise<ContentScriptFunctionResponse> {
@@ -475,11 +527,11 @@ export default defineBackground({
     console.log("Background script starting...");
     
     // Configure sidepanel to open automatically when action icon is clicked
-    if (browser.sidePanel) {
+    if ((browser as any).sidePanel) {
       console.log("Chrome: Setting up sidePanel");
-      browser.sidePanel
+      (browser as any).sidePanel
         .setPanelBehavior({ openPanelOnActionClick: true })
-        .catch((error) => console.error("Error setting panel behavior:", error));
+        .catch((error: any) => console.error("Error setting panel behavior:", error));
     }
     
     // Fallback for Firefox - open sidebar when action is clicked
@@ -499,7 +551,7 @@ export default defineBackground({
       const handleMessage = async () => {
         try {
           console.log("Received message:", message);
-          const msg = message as MessageFromSidebar;
+          const msg = message as MessageToSidebar | MessageFromSidebar;
           switch (msg.type) {
             case "GET_SETTINGS": {
               console.log("Processing GET_SETTINGS request");
@@ -553,6 +605,28 @@ export default defineBackground({
                 payload: updatedSettings,
               };
               sendResponse(response);
+              break;
+            }
+
+            case "CAPTURE_SCREENSHOT": {
+              try {
+                // Get the active tab
+                const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+                if (tabs.length === 0 || !tabs[0].id) {
+                  sendResponse({ success: false, error: "No active tab found" });
+                  break;
+                }
+
+                // Capture screenshot
+                const dataUrl = await browser.tabs.captureVisibleTab();
+                sendResponse({ success: true, dataUrl });
+              } catch (error) {
+                console.error("Screenshot capture error:", error);
+                sendResponse({ 
+                  success: false, 
+                  error: error instanceof Error ? error.message : "Screenshot failed" 
+                });
+              }
               break;
             }
 

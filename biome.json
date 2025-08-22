@@ -13,6 +13,19 @@
     "lineWidth": 100
   },
   "files": {
+    "maxSize": 5000000,
     "includes": ["src/**/*", "tests/**/*", "*.ts", "*.js"]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["tests/**/*"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ]
 }

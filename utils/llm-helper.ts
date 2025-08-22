@@ -6,22 +6,28 @@ export interface LLMHelperInterface {
     limit?: number;
     type?: string;
     visible?: boolean;
-  }): Array<{
-    id: number;
-    text: string;
-    tag: string;
-    classes: string;
-  }>;
-  extract(elementId?: number, property?: string): string;
+    offset?: number;
+  }): {
+    elements: Array<{
+      selector: string;
+      text: string;
+      tag: string;
+      classes: string;
+    }>;
+    total: number;
+    hasMore: boolean;
+  };
+  click(selector: string): string;
+  type(selector: string, text: string): string;
+  extract(selector?: string, property?: string): string;
   summary(): string;
-  clear(): string;
   describe(selector: string): string;
+  screenshot(): Promise<string>;
 }
 
 export function createLLMHelper(): LLMHelperInterface {
-  // Element storage for maintaining references
-  const elementStore = new Map<number, Element>();
-  let nextId = 1;
+  // Counter for generating unique selectors when needed
+  // let selectorCounter = 0; // Commented out as unused
   
   // Settings cache - will be updated from extension settings
   let debugMode = false;
@@ -40,13 +46,53 @@ export function createLLMHelper(): LLMHelperInterface {
     }
   }
 
-  // Helper function to store an element and return its ID
-  function storeElement(element: Element): number {
-    const id = nextId++;
-    elementStore.set(id, element);
-    // Auto-cleanup after 5 minutes to prevent memory leaks
-    setTimeout(() => elementStore.delete(id), 5 * 60 * 1000);
-    return id;
+  // Helper function to generate a unique CSS selector for an element
+  function generateSelector(element: Element): string {
+    // Try to use existing ID
+    if (element.id) {
+      return `#${CSS.escape(element.id)}`;
+    }
+    
+    // Try to use data attributes for uniqueness
+    const dataAttrs = Array.from(element.attributes)
+      .filter(attr => attr.name.startsWith('data-'))
+      .slice(0, 2);
+    
+    if (dataAttrs.length > 0) {
+      const dataSelector = dataAttrs.map(attr => `[${attr.name}="${CSS.escape(attr.value)}"]`).join('');
+      const candidates = document.querySelectorAll(`${element.tagName.toLowerCase()}${dataSelector}`);
+      if (candidates.length === 1) {
+        return `${element.tagName.toLowerCase()}${dataSelector}`;
+      }
+    }
+    
+    // Generate nth-child selector as last resort
+    let selector = element.tagName.toLowerCase();
+    let current = element;
+    
+    while (current.parentElement) {
+      const parent = current.parentElement;
+      const siblings = Array.from(parent.children).filter(child => child.tagName === current.tagName);
+      
+      if (siblings.length > 1) {
+        const index = siblings.indexOf(current) + 1;
+        selector = `${current.tagName.toLowerCase()}:nth-of-type(${index}) > ${selector}`;
+      } else {
+        selector = `${current.tagName.toLowerCase()} > ${selector}`;
+      }
+      
+      current = parent;
+      
+      // Stop if we have a unique selector or reach the body
+      if (parent.tagName === 'BODY' || parent.id) {
+        if (parent.id) {
+          selector = `#${CSS.escape(parent.id)} > ${selector}`;
+        }
+        break;
+      }
+    }
+    
+    return selector;
   }
 
   // Helper function to check if element is visible
@@ -138,37 +184,48 @@ export function createLLMHelper(): LLMHelperInterface {
 
   // LLMHelper interface for browser automation
   const LLMHelper: LLMHelperInterface = {
-    // Find elements matching a pattern
+    // Find elements matching a pattern with pagination
     find(pattern: string, options: {
       limit?: number;
       type?: string;
       visible?: boolean;
-    } = {}): Array<{
-      id: number;
-      text: string;
-      tag: string;
-      classes: string;
-    }> {
+      offset?: number;
+    } = {}): {
+      elements: Array<{
+        selector: string;
+        text: string;
+        tag: string;
+        classes: string;
+      }>;
+      total: number;
+      hasMore: boolean;
+    } {
       try {
         debugLog("find() called", { pattern, options });
         
         const regex = new RegExp(pattern, "i");
-        const selector = options.type === "*" ? "*" : 
-                        options.type || "button, a, input, textarea, select, [role='button']";
+        const selectorQuery = options.type === "*" ? "*" : 
+                             options.type || "button, a, input, textarea, select, [role='button']";
         
-        const candidates = document.querySelectorAll(selector);
-        debugLog(`Found ${candidates.length} candidate elements for selector: ${selector}`);
+        const candidates = document.querySelectorAll(selectorQuery);
+        debugLog(`Found ${candidates.length} candidate elements for selector: ${selectorQuery}`);
         
-        const results = Array.from(candidates)
+        const matchingElements = Array.from(candidates)
           .filter((el) => {
             const text = getElementText(el);
             const matchesPattern = regex.test(text);
             const isVisibleElement = !options.visible || isVisible(el);
             return matchesPattern && isVisibleElement;
-          })
-          .slice(0, options.limit || 10)
+          });
+        
+        const total = matchingElements.length;
+        const limit = options.limit || 10;
+        const offset = options.offset || 0;
+        
+        const paginatedElements = matchingElements
+          .slice(offset, offset + limit)
           .map((el) => ({
-            id: storeElement(el),
+            selector: generateSelector(el),
             text: truncate(getElementText(el), 50),
             tag: el.tagName.toLowerCase(),
             classes: el.className
@@ -176,20 +233,103 @@ export function createLLMHelper(): LLMHelperInterface {
               : "",
           }));
         
-        debugLog(`find() returning ${results.length} elements`, results);
-        return results;
+        const result = {
+          elements: paginatedElements,
+          total,
+          hasMore: offset + limit < total
+        };
+        
+        debugLog(`find() returning ${paginatedElements.length} of ${total} total elements`, result);
+        return result;
       } catch (error) {
         console.error("LLMHelper.find error:", error);
-        return [];
+        return { elements: [], total: 0, hasMore: false };
+      }
+    },
+
+    // Click on an element
+    click(selector: string): string {
+      try {
+        debugLog("click() called", { selector });
+        
+        const element = document.querySelector(selector);
+        if (!element) {
+          return `No element found matching selector: ${selector}`;
+        }
+        
+        // Ensure element is focusable if it's an input
+        if (element instanceof HTMLElement) {
+          element.focus();
+        }
+        
+        // Use MouseEvent for reliable cross-site compatibility
+        const clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window
+        });
+        
+        element.dispatchEvent(clickEvent);
+        
+        const elementInfo = `${element.tagName.toLowerCase()}${element.id ? '#' + element.id : ''}${element.className ? '.' + element.className.split(' ').slice(0, 2).join('.') : ''}`;
+        const result = `Clicked ${elementInfo}`;
+        debugLog("click() result", result);
+        return result;
+      } catch (error) {
+        console.error("LLMHelper.click error:", error);
+        return `Error clicking element: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    },
+
+    // Type text into an element
+    type(selector: string, text: string): string {
+      try {
+        debugLog("type() called", { selector, text });
+        
+        const element = document.querySelector(selector);
+        if (!element) {
+          return `No element found matching selector: ${selector}`;
+        }
+        
+        // Focus the element
+        if (element instanceof HTMLElement) {
+          element.focus();
+        }
+        
+        // Handle different input types
+        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+          // Clear existing content and set new value
+          element.value = text;
+          
+          // Dispatch input and change events for React/Vue compatibility
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+        } else if ((element as HTMLElement).contentEditable === 'true') {
+          // Handle contenteditable elements
+          element.textContent = text;
+          
+          // Dispatch input event for contenteditable
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+          return `Element is not typeable: ${element.tagName.toLowerCase()}`;
+        }
+        
+        const elementInfo = `${element.tagName.toLowerCase()}${element.id ? '#' + element.id : ''}${element.className ? '.' + element.className.split(' ').slice(0, 2).join('.') : ''}`;
+        const result = `Typed "${text}" into ${elementInfo}`;
+        debugLog("type() result", result);
+        return result;
+      } catch (error) {
+        console.error("LLMHelper.type error:", error);
+        return `Error typing into element: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
     },
 
     // Extract text from the page or specific element
-    extract(elementId?: number, property?: string): string {
+    extract(selector?: string, property?: string): string {
       try {
-        debugLog("extract() called", { elementId, property });
-        if (elementId) {
-          const element = elementStore.get(elementId);
+        debugLog("extract() called", { selector, property });
+        if (selector) {
+          const element = document.querySelector(selector);
           if (!element) {
             return "Element not found";
           }
@@ -303,11 +443,28 @@ export function createLLMHelper(): LLMHelperInterface {
       }
     },
 
-    // Clear stored element references
-    clear(): string {
-      elementStore.clear();
-      nextId = 1;
-      return "Element references cleared";
+    // Take a screenshot of the current tab
+    async screenshot(): Promise<string> {
+      try {
+        debugLog("screenshot() called");
+        
+        // Send message to background script to capture screenshot
+        if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
+          const response = await browser.runtime.sendMessage({ type: 'CAPTURE_SCREENSHOT' });
+          
+          if (response && (response as any).success) {
+            debugLog("screenshot() successful", (response as any).dataUrl?.substring(0, 50) + '...');
+            return (response as any).dataUrl;
+          } else {
+            throw new Error((response as any)?.error || 'Screenshot failed - no response');
+          }
+        } else {
+          throw new Error('Browser runtime not available');
+        }
+      } catch (error) {
+        console.error("LLMHelper.screenshot error:", error);
+        throw new Error(`Screenshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     },
 
     // Describe a specific section of the page

@@ -249,6 +249,32 @@ body {
   }
 }
 
+/* Screenshot styling */
+.screenshot-container {
+  margin: 8px 0;
+  display: inline-block;
+  position: relative;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-width: 100%;
+}
+
+.screenshot-thumbnail {
+  max-width: 300px;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  display: block;
+}
+
+.screenshot-thumbnail:hover {
+  transform: scale(1.02);
+  opacity: 0.9;
+}
+
 /* Scrollbar styling */
 .messages-container::-webkit-scrollbar {
   width: 6px;

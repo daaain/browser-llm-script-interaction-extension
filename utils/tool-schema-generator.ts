@@ -10,7 +10,7 @@ export function generateLLMHelperTools(): LLMTool[] {
       type: "function",
       function: {
         name: "find",
-        description: "Find DOM elements on the current web page that match a text pattern. Returns element IDs that can be used with other methods.",
+        description: "Find DOM elements on the current web page that match a text pattern. Returns CSS selectors and pagination info. Use offset to get more results.",
         parameters: {
           type: "object",
           properties: {
@@ -25,6 +25,10 @@ export function generateLLMHelperTools(): LLMTool[] {
                 limit: {
                   type: "number", 
                   description: "Maximum number of results to return (default: 10)"
+                },
+                offset: {
+                  type: "number",
+                  description: "Number of results to skip for pagination (default: 0)"
                 },
                 type: {
                   type: "string",
@@ -42,16 +46,54 @@ export function generateLLMHelperTools(): LLMTool[] {
       }
     },
     {
-      type: "function", 
+      type: "function",
       function: {
-        name: "extract",
-        description: "Extract text content from a specific element by ID, or extract all visible text from the entire page if no ID provided.",
+        name: "click",
+        description: "Click on a DOM element using its CSS selector. Dispatches a MouseEvent for reliable cross-site compatibility.",
         parameters: {
           type: "object",
           properties: {
-            elementId: {
-              type: "number",
-              description: "Optional element ID obtained from find() method. If omitted, extracts all visible page text."
+            selector: {
+              type: "string",
+              description: "CSS selector for the element to click (obtained from find() method)"
+            }
+          },
+          required: ["selector"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "type",
+        description: "Type text into an input element, textarea, or contenteditable element. Triggers input and change events for framework compatibility.",
+        parameters: {
+          type: "object",
+          properties: {
+            selector: {
+              type: "string",
+              description: "CSS selector for the input element (obtained from find() method)"
+            },
+            text: {
+              type: "string",
+              description: "Text to type into the element"
+            }
+          },
+          required: ["selector", "text"]
+        }
+      }
+    },
+    {
+      type: "function", 
+      function: {
+        name: "extract",
+        description: "Extract text content from a specific element by CSS selector, or extract all visible text from the entire page if no selector provided.",
+        parameters: {
+          type: "object",
+          properties: {
+            selector: {
+              type: "string",
+              description: "Optional CSS selector for the element to extract from. If omitted, extracts all visible page text."
             },
             property: {
               type: "string", 
@@ -75,8 +117,8 @@ export function generateLLMHelperTools(): LLMTool[] {
     {
       type: "function",
       function: {
-        name: "clear",
-        description: "Clear all stored element references to free memory. Use this periodically during long sessions.",
+        name: "screenshot",
+        description: "Capture a screenshot of the current visible tab area. Returns a base64-encoded data URL that can be displayed or analyzed.",
         parameters: {
           type: "object", 
           properties: {}
@@ -107,7 +149,7 @@ export function generateLLMHelperTools(): LLMTool[] {
  * Validates if a function name corresponds to an LLMHelper method
  */
 export function isValidLLMHelperMethod(functionName: string): functionName is keyof LLMHelperInterface {
-  const validMethods = ['find', 'extract', 'summary', 'clear', 'describe'] as const;
+  const validMethods = ['find', 'click', 'type', 'extract', 'summary', 'describe', 'screenshot'] as const;
   return validMethods.includes(functionName as any);
 }
 
@@ -125,9 +167,22 @@ export function parseToolCallArguments(functionName: string, argumentsString: st
           throw new Error('find() requires a string pattern argument');
         }
         break;
+      case 'click':
+        if (typeof args.selector !== 'string') {
+          throw new Error('click() requires a string selector argument');
+        }
+        break;
+      case 'type':
+        if (typeof args.selector !== 'string') {
+          throw new Error('type() requires a string selector argument');
+        }
+        if (typeof args.text !== 'string') {
+          throw new Error('type() requires a string text argument');
+        }
+        break;
       case 'extract':
-        if (args.elementId !== undefined && typeof args.elementId !== 'number') {
-          throw new Error('extract() elementId must be a number');
+        if (args.selector !== undefined && typeof args.selector !== 'string') {
+          throw new Error('extract() selector must be a string');
         }
         if (args.property !== undefined && typeof args.property !== 'string') {
           throw new Error('extract() property must be a string');
@@ -139,7 +194,7 @@ export function parseToolCallArguments(functionName: string, argumentsString: st
         }
         break;
       case 'summary':
-      case 'clear':
+      case 'screenshot':
         // These methods don't require arguments
         break;
       default:

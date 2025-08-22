@@ -25,8 +25,14 @@ export default defineContentScript({
               case 'find':
                 result = LLMHelper.find(args.pattern, args.options);
                 break;
+              case 'click':
+                result = LLMHelper.click(args.selector);
+                break;
+              case 'type':
+                result = LLMHelper.type(args.selector, args.text);
+                break;
               case 'extract':
-                result = LLMHelper.extract(args.elementId, args.property);
+                result = LLMHelper.extract(args.selector, args.property);
                 break;
               case 'describe':
                 result = LLMHelper.describe(args.selector);
@@ -34,20 +40,30 @@ export default defineContentScript({
               case 'summary':
                 result = LLMHelper.summary();
                 break;
-              case 'clear':
-                result = LLMHelper.clear();
-                break;
+              case 'screenshot':
+                // Handle screenshot asynchronously
+                LLMHelper.screenshot().then((dataUrl: string) => {
+                  sendResponse({ success: true, result: dataUrl });
+                }).catch((error: unknown) => {
+                  sendResponse({ 
+                    success: false, 
+                    error: error instanceof Error ? error.message : "Screenshot failed" 
+                  });
+                });
+                return true; // Keep message channel open for async response
               default:
                 throw new Error(`Unknown function: ${functionName}`);
             }
             const response = { success: true, result };
             sendResponse(response);
+            return true;
           } else {
             const response = { 
               success: false, 
               error: `Function ${functionName} not found` 
             };
             sendResponse(response);
+            return true;
           }
         } catch (error) {
           const response = { 
@@ -55,6 +71,7 @@ export default defineContentScript({
             error: error instanceof Error ? error.message : "Unknown error" 
           };
           sendResponse(response);
+          return true;
         }
       }
       return true; // Keep the message channel open for async responses

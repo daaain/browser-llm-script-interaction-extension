@@ -5,6 +5,7 @@ import type {
   MessageFromSidebar,
   MessageToSidebar,
   LLMToolCall,
+  MessageContent,
 } from "~/utils/types";
 
 class ChatInterface {
@@ -201,17 +202,33 @@ class ChatInterface {
       
       // Show tool results next if present
       if (message.tool_results && message.tool_results.length > 0) {
-        const toolResultsHtml = message.tool_results.map((tr: {id: string, result: any, error?: string}) => 
-          `<div class="tool-result">
+        const toolResultsHtml = message.tool_results.map((tr: {id: string, result: any, error?: string}) => {
+          if (tr.error) {
+            return `<div class="tool-result">
+              <strong>🔧 Tool Result:</strong>
+              <pre><code>Error: ${tr.error}</code></pre>
+            </div>`;
+          }
+          
+          // Handle screenshot results specially
+          if (tr.result && typeof tr.result === 'object' && tr.result.type === 'screenshot' && tr.result.dataUrl) {
+            return `<div class="tool-result">
+              <strong>🔧 Tool Result:</strong>
+              ${this.formatImageContent(tr.result.dataUrl)}
+            </div>`;
+          }
+          
+          // Regular tool results
+          return `<div class="tool-result">
             <strong>🔧 Tool Result:</strong>
-            <pre><code>${tr.error ? `Error: ${tr.error}` : this.formatToolResult(JSON.stringify(tr.result))}</code></pre>
-          </div>`
-        ).join("");
+            <pre><code>${this.formatToolResult(JSON.stringify(tr.result))}</code></pre>
+          </div>`;
+        }).join("");
         contentParts.push(toolResultsHtml);
       }
       
       // Show assistant response content last (only if not empty)
-      if (message.content && message.content.trim()) {
+      if (message.content && (typeof message.content === 'string' ? message.content.trim() : message.content.length > 0)) {
         contentParts.push(this.formatMessageContent(message.content));
       }
       
@@ -228,21 +245,41 @@ class ChatInterface {
     this.scrollToBottom();
   }
 
-  private formatMessageContent(content: string): string {
+  private formatMessageContent(content: MessageContent): string {
     if (!content) return "";
     
-    let formatted = content;
+    // Handle string content (legacy format)
+    if (typeof content === 'string') {
+      return this.formatTextContent(content);
+    }
+    
+    // Handle multimodal content array
+    return content.map((item: { type: string; text?: string; image_url?: { url: string } }) => {
+      if (item.type === 'text' && item.text) {
+        return this.formatTextContent(item.text);
+      } else if (item.type === 'input_image' && item.image_url) {
+        return this.formatImageContent(item.image_url.url);
+      }
+      return '';
+    }).join('');
+  }
+  
+  private formatTextContent(text: string): string {
+    let formatted = text;
 
     formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, "<pre><code>$2</code></pre>");
-
     formatted = formatted.replace(/`([^`]+)`/g, "<code>$1</code>");
-
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
     formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
     formatted = formatted.replace(/\n/g, "<br>");
 
     return formatted;
+  }
+  
+  private formatImageContent(imageUrl: string): string {
+    return `<div class="screenshot-container">
+      <img src="${imageUrl}" class="screenshot-thumbnail" style="cursor: pointer;">
+    </div>`;
   }
   
   private formatToolArguments(argumentsString: string): string {

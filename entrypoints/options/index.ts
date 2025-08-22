@@ -5,7 +5,7 @@ import { DEFAULT_TRUNCATION_LIMIT } from "~/utils/constants";
 
 class SettingsManager {
   private currentSettings: ExtensionSettings | null = null;
-  private autoSaveTimeout: number | null = null;
+  private autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.init();
@@ -112,46 +112,6 @@ class SettingsManager {
     clearHistoryButton.addEventListener("click", () => this.clearHistory());
   }
 
-  private async saveSettings() {
-    const endpoint = (document.getElementById("endpoint-input") as HTMLInputElement).value;
-    const model = (document.getElementById("model-input") as HTMLInputElement).value;
-    const apiKey = (document.getElementById("api-key-input") as HTMLInputElement).value;
-    const debugMode = (document.getElementById("debug-mode") as HTMLInputElement).checked;
-    const toolsEnabled = (document.getElementById("tools-enabled") as HTMLInputElement).checked;
-    const truncationLimit = parseInt((document.getElementById("truncation-limit-input") as HTMLInputElement).value, 10) || DEFAULT_TRUNCATION_LIMIT;
-
-    if (!endpoint || !model) {
-      this.showMessage("Please fill in all required fields", "error");
-      return;
-    }
-
-    const updatedSettings: ExtensionSettings = {
-      ...this.currentSettings!,
-      provider: {
-        name: "Custom",
-        endpoint,
-        model,
-        apiKey: apiKey || undefined,
-      },
-      debugMode,
-      toolsEnabled,
-      truncationLimit,
-    };
-
-    const message: MessageFromSidebar = {
-      type: "SAVE_SETTINGS",
-      payload: updatedSettings,
-    };
-
-    try {
-      await browser.runtime.sendMessage(message);
-      this.currentSettings = updatedSettings;
-      this.showMessage("Settings saved successfully!", "success");
-    } catch (error) {
-      console.error("Error saving settings:", error);
-      this.showMessage("Error saving settings. Please try again.", "error");
-    }
-  }
 
   private autoSave() {
     // Clear existing timeout to debounce rapid changes

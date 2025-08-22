@@ -5,10 +5,18 @@ export interface LLMProvider {
   apiKey?: string;
 }
 
+export type MessageContent = string | Array<{
+  type: "text" | "input_image";
+  text?: string;
+  image_url?: {
+    url: string;
+  };
+}>;
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "tool";
-  content: string;
+  content: MessageContent;
   timestamp: number;
   tool_calls?: LLMToolCall[];
   tool_call_id?: string;
@@ -17,7 +25,7 @@ export interface ChatMessage {
 }
 
 export interface LLMResponse {
-  content: string;
+  content: MessageContent;
   error?: string;
   tool_calls?: LLMToolCall[];
 }
@@ -42,6 +50,11 @@ export interface LLMTool {
         type: string;
         description?: string;
         enum?: string[];
+        properties?: Record<string, {
+          type: string;
+          description?: string;
+          enum?: string[];
+        }>;
       }>;
       required?: string[];
     };
@@ -58,7 +71,7 @@ export interface ExtensionSettings {
 }
 
 export interface MessageFromSidebar {
-  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS" | "EXECUTE_FUNCTION" | "CLEAR_TAB_CONVERSATION";
+  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS" | "EXECUTE_FUNCTION" | "CLEAR_TAB_CONVERSATION" | "CAPTURE_SCREENSHOT";
   payload: any;
 }
 

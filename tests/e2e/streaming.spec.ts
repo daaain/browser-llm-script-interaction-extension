@@ -25,7 +25,7 @@ test.describe("Streaming Functionality", () => {
               return true;
             }
           }
-        } catch (e) {
+        } catch (_e) {
           // Cross-origin stylesheets may not be accessible
         }
       }
@@ -127,7 +127,7 @@ test.describe("Streaming Functionality", () => {
       return (
         typeof window.chrome !== "undefined" &&
         typeof window.chrome.storage !== "undefined" &&
-        typeof window.chrome.storage.onChanged !== "undefined"
+        typeof (window as any).chrome.storage.onChanged !== "undefined"
       );
     });
 

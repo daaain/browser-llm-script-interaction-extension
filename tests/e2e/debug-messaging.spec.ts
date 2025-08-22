@@ -10,7 +10,7 @@ test.describe("Debug Messaging", () => {
     }
   });
 
-  test("should load content script on test pages", async ({ context, extensionId }) => {
+  test("should load content script on test pages", async ({ context }) => {
     // Create a test page
     const testPage = await context.newPage();
     await testPage.setContent(`
@@ -66,9 +66,9 @@ test.describe("Debug Messaging", () => {
       try {
         // Test settings message first
         const settingsResponse = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (response: any) => {
-            if (chrome.runtime.lastError) {
-              reject(chrome.runtime.lastError);
+          (globalThis as any).chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (response: any) => {
+            if ((globalThis as any).chrome.runtime.lastError) {
+              reject((globalThis as any).chrome.runtime.lastError);
             } else {
               resolve(response);
             }
@@ -108,7 +108,7 @@ test.describe("Debug Messaging", () => {
     }
   });
 
-  test("should wait for content script injection properly", async ({ context, extensionId }) => {
+  test("should wait for content script injection properly", async ({ context }) => {
     const testPage = await context.newPage();
 
     // Create a page that might load content scripts

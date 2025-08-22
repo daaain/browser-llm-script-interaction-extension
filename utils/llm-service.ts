@@ -1,8 +1,24 @@
-import type { ChatMessage, LLMProvider, LLMResponse, LLMTool, LLMToolCall } from "~/utils/types";
+import type { ChatMessage, LLMProvider, LLMResponse, LLMTool, LLMToolCall, MessageContent } from "~/utils/types";
 import { generateLLMHelperTools } from "~/utils/tool-schema-generator";
 
 export class LLMService {
   constructor(private provider: LLMProvider, private toolsEnabled: boolean = false) {}
+
+  private formatContentForAPI(content: MessageContent): any {
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    // Convert our format to OpenAI API format
+    return content.map(item => {
+      if (item.type === 'text') {
+        return { type: 'text', text: item.text };
+      } else if (item.type === 'input_image') {
+        return { type: 'input_image', image_url: item.image_url };
+      }
+      return item;
+    });
+  }
 
   async sendMessage(
     messages: ChatMessage[], 
@@ -23,7 +39,7 @@ export class LLMService {
         messages: messages.map((msg) => {
           const apiMessage: any = {
             role: msg.role,
-            content: msg.content,
+            content: this.formatContentForAPI(msg.content),
           };
           
           // Add tool calls if present (for assistant messages)

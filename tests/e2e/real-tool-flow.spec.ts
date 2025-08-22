@@ -39,7 +39,7 @@ test.describe("Real Tool Flow", () => {
     );
   });
 
-  test("should test content script functions directly", async ({ context, extensionId }) => {
+  test("should test content script functions directly", async ({ context }) => {
     // Create a test page with content to find
     const testPage = await context.newPage();
     await testPage.setContent(`
@@ -88,7 +88,6 @@ test.describe("Real Tool Flow", () => {
 
   test("should handle tool function calls through extension messaging", async ({
     context,
-    extensionId,
   }) => {
     // Create a test page
     const testPage = await context.newPage();
@@ -108,15 +107,15 @@ test.describe("Real Tool Flow", () => {
     const messageResult = await testPage.evaluate(async () => {
       try {
         const response = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage(
+          (globalThis as any).chrome.runtime.sendMessage(
             {
               type: "EXECUTE_FUNCTION",
               function: "find",
               arguments: { pattern: ".*", options: { type: "a" } },
             },
             (response: any) => {
-              if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
+              if ((globalThis as any).chrome.runtime.lastError) {
+                reject((globalThis as any).chrome.runtime.lastError);
               } else {
                 resolve(response);
               }
@@ -199,9 +198,9 @@ test.describe("Real Tool Flow", () => {
     // Test that storage listener is working by checking it exists
     const listenerExists = await sidepanelPage.evaluate(() => {
       return (
-        typeof chrome !== "undefined" &&
-        typeof chrome.storage !== "undefined" &&
-        typeof chrome.storage.onChanged !== "undefined"
+        typeof (globalThis as any).chrome !== "undefined" &&
+        typeof (globalThis as any).chrome.storage !== "undefined" &&
+        typeof (globalThis as any).chrome.storage.onChanged !== "undefined"
       );
     });
 

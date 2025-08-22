@@ -7,6 +7,5 @@ Roadmap / TODO:
 - do actions
 - save complex function call sequence into action scripts
 - remove clear()
-- remove duplicate tool response + make font bigger
 - system prompt with and without tools
 - tool parameters to choose number of items / length to return, paging, and reporting how much there is
