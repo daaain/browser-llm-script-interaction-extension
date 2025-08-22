@@ -66,13 +66,16 @@ test.describe("Debug Messaging", () => {
       try {
         // Test settings message first
         const settingsResponse = await new Promise((resolve, reject) => {
-          (globalThis as any).chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (response: any) => {
-            if ((globalThis as any).chrome.runtime.lastError) {
-              reject((globalThis as any).chrome.runtime.lastError);
-            } else {
-              resolve(response);
-            }
-          });
+          (globalThis as any).chrome.runtime.sendMessage(
+            { type: "GET_SETTINGS" },
+            (response: any) => {
+              if ((globalThis as any).chrome.runtime.lastError) {
+                reject((globalThis as any).chrome.runtime.lastError);
+              } else {
+                resolve(response);
+              }
+            },
+          );
           setTimeout(() => reject(new Error("Timeout")), 5000);
         });
 

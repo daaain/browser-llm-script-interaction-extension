@@ -86,9 +86,7 @@ test.describe("Real Tool Flow", () => {
     expect(summaryResult).toContain("Test Page for LLM Tools");
   });
 
-  test("should handle tool function calls through extension messaging", async ({
-    context,
-  }) => {
+  test("should handle tool function calls through extension messaging", async ({ context }) => {
     // Create a test page
     const testPage = await context.newPage();
     await testPage.setContent(`

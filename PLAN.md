@@ -9,3 +9,5 @@ Roadmap / TODO:
 - remove clear()
 - system prompt with and without tools
 - tool parameters to choose number of items / length to return, paging, and reporting how much there is
+- replace function test buttons with full list of functions and way to manually call any of them
+- tutorial / welcome screen

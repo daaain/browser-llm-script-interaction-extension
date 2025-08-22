@@ -421,6 +421,21 @@ body {
   box-sizing: border-box;
 }
 
+.tool-result.executing {
+  background-color: #fff3e0;
+  border-color: #ffcc02;
+  color: #e65100;
+}
+
+.tool-result.executing em {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .tool-result strong {
   display: inline-block;
   margin-bottom: 4px;

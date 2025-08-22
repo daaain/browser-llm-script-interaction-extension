@@ -4,7 +4,6 @@ import type {
   ExtensionSettings,
   MessageFromSidebar,
   MessageToSidebar,
-  LLMToolCall,
   MessageContent,
 } from "~/utils/types";
 
@@ -178,8 +177,6 @@ class ChatInterface {
     } else {
       messageElement.classList.remove("streaming");
     }
-
-    let content = "";
     
     // Handle different message types
     if (message.role === "tool") {
@@ -187,62 +184,161 @@ class ChatInterface {
       messageElement.style.display = 'none';
       return;
     } else if (message.role === "assistant") {
-      // Build structured content with proper ordering
-      const contentParts: string[] = [];
-      
-      // Show tool calls first if present
-      if (message.tool_calls && message.tool_calls.length > 0) {
-        const toolCallsHtml = message.tool_calls.map((tc: LLMToolCall) => 
-          `<div class="tool-call">
-            <strong>🛠️ Calling:</strong><br>${tc.function.name}(${this.formatToolArguments(tc.function.arguments)})
-          </div>`
-        ).join("");
-        contentParts.push(toolCallsHtml);
-      }
-      
-      // Show tool results next if present
-      if (message.tool_results && message.tool_results.length > 0) {
-        const toolResultsHtml = message.tool_results.map((tr: {id: string, result: any, error?: string}) => {
-          if (tr.error) {
-            return `<div class="tool-result">
-              <strong>🔧 Tool Result:</strong>
-              <pre><code>Error: ${tr.error}</code></pre>
-            </div>`;
-          }
-          
-          // Handle screenshot results specially
-          if (tr.result && typeof tr.result === 'object' && tr.result.type === 'screenshot' && tr.result.dataUrl) {
-            return `<div class="tool-result">
-              <strong>🔧 Tool Result:</strong>
-              ${this.formatImageContent(tr.result.dataUrl)}
-            </div>`;
-          }
-          
-          // Regular tool results
-          return `<div class="tool-result">
-            <strong>🔧 Tool Result:</strong>
-            <pre><code>${this.formatToolResult(JSON.stringify(tr.result))}</code></pre>
-          </div>`;
-        }).join("");
-        contentParts.push(toolResultsHtml);
-      }
-      
-      // Show assistant response content last (only if not empty)
-      if (message.content && (typeof message.content === 'string' ? message.content.trim() : message.content.length > 0)) {
-        contentParts.push(this.formatMessageContent(message.content));
-      }
-      
-      content = contentParts.join("");
+      this.updateAssistantMessage(messageElement, message);
     } else {
-      content = this.formatMessageContent(message.content);
-    }
-    
-    // Only update innerHTML if content actually changed (optimization for streaming)
-    if (messageElement.innerHTML !== content) {
-      messageElement.innerHTML = content;
+      // For user messages, update content directly
+      const formattedContent = this.formatMessageContent(message.content);
+      if (messageElement.innerHTML !== formattedContent) {
+        messageElement.innerHTML = formattedContent;
+      }
     }
     
     this.scrollToBottom();
+  }
+
+  private updateAssistantMessage(messageElement: HTMLElement, message: ChatMessage) {
+    // For streaming messages, handle incremental updates more carefully
+    if (message.isStreaming) {
+      this.updateStreamingMessage(messageElement, message);
+    } else {
+      // For non-streaming messages, rebuild completely
+      const contentHTML = this.buildAssistantMessageHTML(message);
+      if (messageElement.innerHTML !== contentHTML) {
+        messageElement.innerHTML = contentHTML;
+      }
+    }
+  }
+
+  private updateStreamingMessage(messageElement: HTMLElement, message: ChatMessage) {
+    // For streaming messages, we need to carefully update different parts
+    const existingContent = messageElement.innerHTML;
+    const newContent = this.buildAssistantMessageHTML(message);
+    
+    // Only update if the content has actually changed to avoid DOM thrashing
+    if (existingContent !== newContent) {
+      // Check if we're just updating text content in an existing structure
+      if (this.canUpdateTextContentOnly(messageElement, message)) {
+        // Use streamingText during streaming if available
+        const textContent = message.isStreaming && (message as any).streamingText 
+          ? (message as any).streamingText 
+          : message.content;
+        this.updateExistingTextContent(messageElement, textContent);
+      } else {
+        // Full rebuild needed (e.g., tool calls/results added)
+        messageElement.innerHTML = newContent;
+      }
+    }
+  }
+
+  private canUpdateTextContentOnly(messageElement: HTMLElement, message: ChatMessage): boolean {
+    // Only do incremental text updates if:
+    // 1. We already have some structure
+    // 2. No new tool calls since last update
+    // 3. No new tool results since last update
+    
+    const hasExistingStructure = messageElement.children.length > 0;
+    if (!hasExistingStructure) return false;
+    
+    // Check if structure matches current message
+    const existingToolCalls = messageElement.querySelectorAll('.tool-call').length;
+    const existingToolResults = messageElement.querySelectorAll('.tool-result').length;
+    const currentToolCalls = message.tool_calls?.length || 0;
+    const currentToolResults = message.tool_results?.length || 0;
+    
+    // Only do incremental update if tool structure hasn't changed
+    return existingToolCalls === currentToolCalls && existingToolResults === currentToolResults;
+  }
+
+  private buildAssistantMessageHTML(message: ChatMessage): string {
+    const contentParts: string[] = [];
+    
+    // Interleave tool calls with their corresponding results
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      for (const toolCall of message.tool_calls) {
+        // Add the tool call
+        const toolCallHtml = `<div class="tool-call">
+          <strong>🛠️ Calling:</strong><br>${toolCall.function.name}(${this.formatToolArguments(toolCall.function.arguments)})
+        </div>`;
+        contentParts.push(toolCallHtml);
+        
+        // Find the corresponding tool result
+        const toolResult = message.tool_results?.find(tr => tr.id === toolCall.id);
+        
+        let toolResultHtml = "";
+        if (toolResult) {
+          if (toolResult.error) {
+            toolResultHtml = `<div class="tool-result">
+              <strong>🔧 Tool Result:</strong>
+              <pre><code>Error: ${toolResult.error}</code></pre>
+            </div>`;
+          } else if (toolResult.result && typeof toolResult.result === 'object' && toolResult.result.type === 'screenshot' && toolResult.result.dataUrl) {
+            // Handle screenshot results specially
+            toolResultHtml = `<div class="tool-result">
+              <strong>🔧 Tool Result:</strong>
+              ${this.formatImageContent(toolResult.result.dataUrl)}
+            </div>`;
+          } else {
+            // Regular tool results
+            toolResultHtml = `<div class="tool-result">
+              <strong>🔧 Tool Result:</strong>
+              <pre><code>${this.formatToolResult(JSON.stringify(toolResult.result))}</code></pre>
+            </div>`;
+          }
+        } else {
+          // If no result found yet, show a placeholder (for streaming scenarios)
+          toolResultHtml = `<div class="tool-result executing">
+            <strong>🔧 Tool Result:</strong>
+            <em>Executing...</em>
+          </div>`;
+        }
+        
+        contentParts.push(toolResultHtml);
+      }
+    }
+    
+    // Add assistant text content at the end
+    // During streaming, use streamingText if available, otherwise use content
+    const textContent = message.isStreaming && (message as any).streamingText 
+      ? (message as any).streamingText 
+      : message.content;
+      
+    if (textContent && (typeof textContent === 'string' ? textContent.trim() : textContent.length > 0)) {
+      const textHtml = `<div class="assistant-text">
+        ${this.formatMessageContent(textContent)}
+      </div>`;
+      contentParts.push(textHtml);
+    }
+    
+    return contentParts.join('');
+  }
+
+  private updateExistingTextContent(messageElement: HTMLElement, content: any) {
+    let textContainer = messageElement.querySelector('.assistant-text') as HTMLElement;
+    
+    // Create text container if it doesn't exist and we have content
+    if (!textContainer && content && (typeof content === 'string' ? content.trim() : content.length > 0)) {
+      textContainer = document.createElement('div');
+      textContainer.className = 'assistant-text';
+      messageElement.appendChild(textContainer);
+    }
+    
+    if (!textContainer) return;
+    
+    // Update text content incrementally for streaming effect
+    if (content && (typeof content === 'string' ? content.trim() : content.length > 0)) {
+      const formattedContent = this.formatMessageContent(content);
+      const currentContent = textContainer.innerHTML;
+      
+      // For streaming, only update if content has grown (avoid flashing)
+      if (formattedContent !== currentContent && formattedContent.length >= currentContent.length) {
+        textContainer.innerHTML = formattedContent;
+      }
+    } else {
+      // Clear text content if empty
+      if (textContainer.innerHTML !== '') {
+        textContainer.innerHTML = '';
+      }
+    }
   }
 
   private formatMessageContent(content: MessageContent): string {

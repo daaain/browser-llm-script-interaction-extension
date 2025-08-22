@@ -182,9 +182,7 @@ test.describe("Tool Functionality", () => {
     expect(invalidExtract).toContain("Element not found");
   });
 
-  test("should communicate between content script and background", async ({
-    context,
-  }) => {
+  test("should communicate between content script and background", async ({ context }) => {
     const testPage = await context.newPage();
     await testPage.setContent(`
       <html>
@@ -255,7 +253,7 @@ test.describe("Tool Functionality", () => {
     // We can't easily test the internal tool generation without more setup
     expect(serviceWorker).toBeDefined();
     expect(serviceWorker.url()).toContain("background");
-    
+
     // Verify tools are valid if we can test them
     if (toolsValid !== undefined) {
       expect(typeof toolsValid).toBe("boolean");

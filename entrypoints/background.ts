@@ -31,7 +31,7 @@ async function getSettings(): Promise<ExtensionSettings> {
       let needsUpdate = false;
       
       if (typeof settings.debugMode === 'undefined') {
-        settings.debugMode = false;
+        settings.debugMode = true;
         needsUpdate = true;
         console.log("Added missing debugMode to existing settings");
       }
@@ -62,7 +62,7 @@ async function getSettings(): Promise<ExtensionSettings> {
         apiKey: "",
       },
       chatHistory: [],
-      debugMode: false,
+      debugMode: true,
       truncationLimit: DEFAULT_TRUNCATION_LIMIT,
       toolsEnabled: true,
     };
@@ -89,6 +89,212 @@ async function saveSettings(settings: ExtensionSettings): Promise<void> {
   }
 }
 
+async function handleRecursiveToolCalls(
+  conversationForFinalCall: ChatMessage[],
+  streamingMessage: ChatMessage,
+  tabId: number | undefined,
+  messagesForAPI: ChatMessage[],
+  currentConversation: ChatMessage[],
+  finalTools: any
+): Promise<void> {
+  const maxToolCallRounds = 20; // Prevent infinite loops
+  let toolCallRound = 0;
+  
+  while (toolCallRound < maxToolCallRounds) {
+    try {
+      const finalResponseCallback = async (content: string, isComplete: boolean) => {
+        // Store streaming text separately to preserve existing tool calls/results
+        (streamingMessage as any).streamingText = content;
+        if (isComplete) {
+          // On completion, set the final content and clean up
+          streamingMessage.content = content;
+          delete (streamingMessage as any).isStreaming;
+          delete (streamingMessage as any).streamingText;
+        }
+        
+        // Update conversation with final response
+        currentConversation = [...messagesForAPI, streamingMessage];
+        
+        // Update storage with debouncing for final response
+        const doUpdate = async () => {
+          try {
+            if (tabId) {
+              const currentSettings = await getSettings();
+              const tabConversations = currentSettings.tabConversations || {};
+              tabConversations[tabId.toString()] = currentConversation;
+              await browser.storage.local.set({ 
+                settings: { ...currentSettings, tabConversations } 
+              });
+            } else {
+              const currentSettings = await getSettings();
+              await browser.storage.local.set({ 
+                settings: { ...currentSettings, chatHistory: currentConversation } 
+              });
+            }
+          } catch (error) {
+            console.error("Error updating final response:", error);
+          }
+        };
+        
+        if (isComplete) {
+          await doUpdate();
+        } else {
+          // Small debounce for final response streaming
+          setTimeout(doUpdate, 50);
+        }
+      };
+      
+      const finalResponse = await llmService!.sendMessage(conversationForFinalCall, finalTools, finalResponseCallback);
+      
+      // Check if the response has new tool calls
+      if (finalResponse.tool_calls && finalResponse.tool_calls.length > 0) {
+        console.log(`Round ${toolCallRound + 1}: Processing ${finalResponse.tool_calls.length} additional tool calls`);
+        
+        // Update the streaming message with the response that contains tool calls
+        // Don't overwrite content yet, preserve existing structure
+        (streamingMessage as any).streamingText = finalResponse.content;
+        
+        // Accumulate tool calls from all rounds
+        if (!streamingMessage.tool_calls) {
+          streamingMessage.tool_calls = [];
+        }
+        streamingMessage.tool_calls.push(...finalResponse.tool_calls);
+        
+        delete (streamingMessage as any).isStreaming;
+        
+        // Execute the new tool calls
+        const toolResults: Array<{id: string, result: any, error?: string}> = [];
+        
+        for (const toolCall of finalResponse.tool_calls) {
+          try {
+            const toolResult = await executeToolCall(toolCall);
+            
+            // Special handling for screenshot results
+            if (toolCall.function.name === 'screenshot' && typeof toolResult.result === 'string' && toolResult.result.startsWith('data:image/')) {
+              toolResults.push({
+                id: toolCall.id,
+                result: {
+                  type: 'screenshot',
+                  dataUrl: toolResult.result,
+                  description: 'Screenshot captured successfully'
+                }
+              });
+            } else {
+              toolResults.push({
+                id: toolCall.id,
+                result: toolResult.result
+              });
+            }
+            
+            console.log(`Tool call ${toolCall.function.name} executed successfully`);
+          } catch (error) {
+            console.error(`Error executing tool call ${toolCall.function.name}:`, error);
+            toolResults.push({
+              id: toolCall.id,
+              result: null,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+        
+        // Add tool results to the streaming message
+        if (!streamingMessage.tool_results) {
+          streamingMessage.tool_results = [];
+        }
+        streamingMessage.tool_results.push(...toolResults);
+        
+        // Update storage with new tool results
+        currentConversation = [...messagesForAPI, streamingMessage];
+        if (tabId) {
+          const currentSettings = await getSettings();
+          const tabConversations = currentSettings.tabConversations || {};
+          tabConversations[tabId.toString()] = currentConversation;
+          await browser.storage.local.set({ 
+            settings: { ...currentSettings, tabConversations } 
+          });
+        } else {
+          const currentSettings = await getSettings();
+          await browser.storage.local.set({ 
+            settings: { ...currentSettings, chatHistory: currentConversation } 
+          });
+        }
+        
+        // Build conversation for next round
+        conversationForFinalCall = [...messagesForAPI, streamingMessage];
+        
+        // Add regular tool results as text-only tool messages
+        for (const toolResult of toolResults) {
+          conversationForFinalCall.push({
+            id: `tool-${toolResult.id}`,
+            role: "tool" as const,
+            content: toolResult.error ? `Error: ${toolResult.error}` : 
+                     (toolResult.result?.type === 'screenshot' ? 'Screenshot captured successfully' : JSON.stringify(toolResult.result)),
+            timestamp: Date.now(),
+            tool_call_id: toolResult.id,
+          });
+        }
+        
+        // Check if there are any screenshot results for next round
+        const screenshotResults = toolResults.filter(tr => 
+          tr.result && 
+          typeof tr.result === 'object' && 
+          tr.result.type === 'screenshot' && 
+          tr.result.dataUrl
+        );
+        
+        // If there are screenshots, add them as a follow-up user message with images
+        if (screenshotResults.length > 0) {
+          const imageContent: Array<{
+            type: "text" | "input_image";
+            text?: string;
+            image_url?: { url: string };
+          }> = [
+            {
+              type: "text" as const,
+              text: "Here is the screenshot:"
+            },
+            ...screenshotResults.map(sr => ({
+              type: "input_image" as const,
+              image_url: {
+                url: sr.result.dataUrl
+              }
+            }))
+          ];
+          
+          conversationForFinalCall.push({
+            id: `screenshot-analysis-${Date.now()}`,
+            role: "user" as const,
+            content: imageContent,
+            timestamp: Date.now(),
+          });
+        }
+        
+        // Continue to next round
+        toolCallRound++;
+        
+        // Reset streaming message content for the next round
+        streamingMessage.content = "";
+        streamingMessage.isStreaming = true;
+        
+      } else {
+        // No more tool calls, update final content and exit loop
+        if (finalResponse.content) {
+          streamingMessage.content = finalResponse.content;
+          delete (streamingMessage as any).isStreaming;
+        }
+        break;
+      }
+    } catch (error) {
+      console.error(`Error in tool call round ${toolCallRound + 1}:`, error);
+      break;
+    }
+  }
+  
+  if (toolCallRound >= maxToolCallRounds) {
+    console.warn('Maximum tool call rounds reached, stopping to prevent infinite loops');
+  }
+}
+
 async function sendChatMessage(message: string, tabId?: number): Promise<string> {
   if (!llmService) {
     const settings = await getSettings();
@@ -111,12 +317,10 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
 
   const messagesForAPI = [...conversationHistory, newMessage];
   
-  // Include tools if enabled and we haven't already used tools in this conversation
-  const hasToolCalls = conversationHistory.some(msg => msg.tool_calls && msg.tool_calls.length > 0);
-  const shouldIncludeTools = settings.toolsEnabled && !hasToolCalls;
-  const finalTools = shouldIncludeTools ? llmService.getAvailableTools() : undefined;
+  // Include tools if enabled
+  const finalTools = settings.toolsEnabled ? llmService.getAvailableTools() : undefined;
   
-  console.log(`Sending message with tools: ${finalTools ? 'enabled' : 'disabled'}, hasToolCalls: ${hasToolCalls}`);
+  console.log(`Sending message with tools: ${finalTools ? 'enabled' : 'disabled'}`);
   
   // Create a temporary streaming message for real-time updates
   const streamingMessageId = `streaming-${Date.now()}`;
@@ -147,9 +351,13 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
   // Debounced storage update for streaming
   let updateTimeout: NodeJS.Timeout | null = null;
   const updateStorage = async (content: string, isComplete: boolean) => {
-    streamingMessage.content = content;
+    // Store streaming text separately to preserve tool calls/results
+    (streamingMessage as any).streamingText = content;
     if (isComplete) {
+      // On completion, set the final content and clean up
+      streamingMessage.content = content;
       delete (streamingMessage as any).isStreaming;
+      delete (streamingMessage as any).streamingText;
     }
     
     // Update conversation
@@ -193,16 +401,39 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
     throw new Error(response.error);
   }
 
-  // Update the streaming message with final content and tool calls
-  streamingMessage.content = response.content;
+  // Update the streaming message with tool calls but preserve existing structure
   streamingMessage.tool_calls = response.tool_calls;
+  
+  // Only set content if we haven't been streaming (no streamingText)
+  if (!(streamingMessage as any).streamingText) {
+    streamingMessage.content = response.content;
+  } else {
+    // We've been streaming - set final content from streamingText and clean up
+    streamingMessage.content = (streamingMessage as any).streamingText;
+    delete (streamingMessage as any).streamingText;
+  }
+  
   delete (streamingMessage as any).isStreaming;
 
-  let updatedConversation = [...messagesForAPI, streamingMessage];
-  
   // Handle tool calls if present
   if (response.tool_calls && response.tool_calls.length > 0) {
     console.log(`Processing ${response.tool_calls.length} tool calls`);
+    
+    // First, update storage to show tool calls (before results)
+    currentConversation = [...messagesForAPI, streamingMessage];
+    if (tabId) {
+      const currentSettings = await getSettings();
+      const tabConversations = currentSettings.tabConversations || {};
+      tabConversations[tabId.toString()] = currentConversation;
+      await browser.storage.local.set({ 
+        settings: { ...currentSettings, tabConversations } 
+      });
+    } else {
+      const currentSettings = await getSettings();
+      await browser.storage.local.set({ 
+        settings: { ...currentSettings, chatHistory: currentConversation } 
+      });
+    }
     
     // Execute each tool call and collect results
     const toolResults: Array<{id: string, result: any, error?: string}> = [];
@@ -242,6 +473,9 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
     
     // Add tool results to the streaming message
     streamingMessage.tool_results = toolResults;
+    
+    // Ensure streaming message is marked as complete now that tools are done
+    delete (streamingMessage as any).isStreaming;
     
     // Update storage to show tool execution completed
     currentConversation = [...messagesForAPI, streamingMessage];
@@ -309,80 +543,11 @@ async function sendChatMessage(message: string, tabId?: number): Promise<string>
       });
     }
     
-    // Get final response from LLM with tool results
-    try {
-      const finalResponseCallback = async (content: string, isComplete: boolean) => {
-        // Update the streaming message with final content
-        streamingMessage.content = content;
-        if (isComplete) {
-          delete (streamingMessage as any).isStreaming;
-        }
-        
-        // Update conversation with final response
-        currentConversation = [...messagesForAPI, streamingMessage];
-        
-        // Update storage with debouncing for final response
-        const doUpdate = async () => {
-          try {
-            if (tabId) {
-              const currentSettings = await getSettings();
-              const tabConversations = currentSettings.tabConversations || {};
-              tabConversations[tabId.toString()] = currentConversation;
-              await browser.storage.local.set({ 
-                settings: { ...currentSettings, tabConversations } 
-              });
-            } else {
-              const currentSettings = await getSettings();
-              await browser.storage.local.set({ 
-                settings: { ...currentSettings, chatHistory: currentConversation } 
-              });
-            }
-          } catch (error) {
-            console.error("Error updating final response:", error);
-          }
-        };
-        
-        if (isComplete) {
-          await doUpdate();
-        } else {
-          // Small debounce for final response streaming
-          setTimeout(doUpdate, 50);
-        }
-      };
-      
-      const finalResponse = await llmService.sendMessage(conversationForFinalCall, undefined, finalResponseCallback);
-      
-      if (finalResponse.content) {
-        // Update the streaming message with final content
-        streamingMessage.content = finalResponse.content;
-        delete (streamingMessage as any).isStreaming;
-        
-        // Return the final response content
-        response.content = finalResponse.content;
-      }
-    } catch (error) {
-      console.error("Error getting final response after tool calls:", error);
-      // Keep the original tool call response
-    }
+    // Handle potential recursive tool calls
+    await handleRecursiveToolCalls(conversationForFinalCall, streamingMessage, tabId, messagesForAPI, currentConversation, finalTools);
   }
 
-  // Final save to conversation history (only if no tool calls, as tool calls handle their own saves)
-  if (!response.tool_calls || response.tool_calls.length === 0) {
-    if (tabId) {
-      const tabConversations = settings.tabConversations || {};
-      tabConversations[tabId.toString()] = updatedConversation;
-      
-      await saveSettings({
-        ...settings,
-        tabConversations,
-      });
-    } else {
-      await saveSettings({
-        ...settings,
-        chatHistory: updatedConversation,
-      });
-    }
-  }
+  // Streaming callback already handles all saves, including completion
 
   return typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 }

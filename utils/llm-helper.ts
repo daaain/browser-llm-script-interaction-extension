@@ -212,8 +212,8 @@ export function createLLMHelper(): LLMHelperInterface {
         
         const matchingElements = Array.from(candidates)
           .filter((el) => {
-            const text = getElementText(el);
-            const matchesPattern = regex.test(text);
+            const htmlContent = el.outerHTML;
+            const matchesPattern = regex.test(htmlContent);
             const isVisibleElement = !options.visible || isVisible(el);
             return matchesPattern && isVisibleElement;
           });

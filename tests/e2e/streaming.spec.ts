@@ -10,7 +10,7 @@ test.describe("Streaming Functionality", () => {
     }
   });
 
-  test("should show streaming indicator for messages", async ({ context, extensionId }) => {
+  test("should show streaming indicator CSS class", async ({ context, extensionId }) => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
@@ -35,102 +35,166 @@ test.describe("Streaming Functionality", () => {
     expect(streamingCSSExists).toBe(true);
   });
 
-  test("should handle message updates with data-message-id", async ({ context, extensionId }) => {
+
+  test("should stream text with real LLM API and tool calls", async ({ context, extensionId }) => {
+    // First configure the extension
+    const optionsPage = await context.newPage();
+    await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
+    await optionsPage.locator("#endpoint-input").fill("http://localhost:1234/v1/chat/completions");
+    await optionsPage.locator("#model-input").fill("qwen/qwen3-coder-30b");
+    await optionsPage.locator("#tools-enabled").check();
+    await optionsPage.waitForTimeout(2000); // Wait for auto-save
+
+    // Set up test page for tools to interact with - use a real website since content scripts don't run on extension pages
+    const testPage = await context.newPage();
+    await testPage.goto("https://example.com");
+
+    // Open sidepanel
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
-    // Test that the UI can create and update messages with data-message-id
-    const testResult = await sidepanelPage.evaluate(() => {
-      // Simulate adding a streaming message
-      const messagesContainer = document.getElementById("messages");
-      if (!messagesContainer) return false;
+    // Track streaming updates
+    const streamingUpdates: string[] = [];
+    let isStreaming = false;
 
-      // Create a test message element
-      const messageElement = document.createElement("div");
-      messageElement.className = "message assistant streaming";
-      messageElement.dataset.messageId = "test-streaming-123";
-      messageElement.innerHTML = "Initial content...";
-      messagesContainer.appendChild(messageElement);
+    // Monitor DOM changes for streaming
+    await sidepanelPage.evaluate(() => {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === "childList" || mutation.type === "characterData") {
+            const assistantMessages = document.querySelectorAll(".message.assistant");
+            const lastMessage = assistantMessages[assistantMessages.length - 1] as HTMLElement;
+            if (lastMessage) {
+              (window as any).lastMessageUpdate = {
+                content: lastMessage.innerHTML,
+                isStreaming: lastMessage.classList.contains("streaming"),
+                timestamp: Date.now(),
+              };
+            }
+          }
+        });
+      });
 
-      // Verify the element was added
-      const added = messagesContainer.querySelector('[data-message-id="test-streaming-123"]');
-      if (!added) return false;
+      const messagesEl = document.getElementById("messages");
+      if (messagesEl) {
+        observer.observe(messagesEl, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
+      }
+    });
 
-      // Test updating the message
-      const existing = messagesContainer.querySelector(
-        '[data-message-id="test-streaming-123"]',
-      ) as HTMLElement;
-      if (existing) {
-        existing.innerHTML = "Updated content!";
-        existing.classList.remove("streaming");
+    // Send a simple message first to verify basic streaming works
+    const messageInput = sidepanelPage.locator("#message-input");
+    await messageInput.fill("Hello! Just say hi back.");
+
+    const sendBtn = sidepanelPage.locator("#send-btn");
+    await sendBtn.click();
+
+    // Wait for streaming to start
+    await expect(sidepanelPage.locator(".message.assistant.streaming")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Wait for streaming to complete
+    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0, {
+      timeout: 15000,
+    });
+
+    // Verify we got a response
+    const firstResponse = await sidepanelPage.locator(".message.assistant").textContent();
+    expect(firstResponse).toBeTruthy();
+    expect(firstResponse).toMatch(/(hi|hello)/i);
+
+    // Now send a message that should trigger tool calls (even if tools fail, we can test the UI)
+    await messageInput.fill("Please take a screenshot and describe what you see.");
+    await sendBtn.click();
+
+    // Wait for streaming to start
+    await expect(sidepanelPage.locator(".message.assistant.streaming")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Collect streaming updates
+    let streamingComplete = false;
+    let checkCount = 0;
+    const maxChecks = 50; // 25 seconds max
+
+    while (!streamingComplete && checkCount < maxChecks) {
+      await sidepanelPage.waitForTimeout(500);
+
+      const update = await sidepanelPage.evaluate(() => {
+        return (window as any).lastMessageUpdate;
+      });
+
+      if (update) {
+        streamingUpdates.push(update.content);
+        isStreaming = update.isStreaming;
+
+        if (!update.isStreaming) {
+          streamingComplete = true;
+        }
       }
 
-      // Verify the update worked
-      const updated = messagesContainer.querySelector(
-        '[data-message-id="test-streaming-123"]',
-      ) as HTMLElement;
-      return (
-        updated &&
-        updated.innerHTML === "Updated content!" &&
-        !updated.classList.contains("streaming")
-      );
-    });
+      checkCount++;
+    }
 
-    expect(testResult).toBe(true);
+    // Verify streaming behavior
+    expect(streamingUpdates.length).toBeGreaterThan(1); // Should have multiple updates
+    expect(isStreaming).toBe(false); // Should have finished streaming
+
+    // Check final message - should contain tool calls even if they fail
+    const finalMessage = await sidepanelPage.locator(".message.assistant").last();
+    const finalContent = await finalMessage.innerHTML();
+
+    // Should contain tool calls (even if they fail)
+    expect(finalContent).toContain("tool-call");
+    expect(finalContent).toContain("screenshot");
+
+    // Should contain tool results (even if undefined/failed)
+    expect(finalContent).toContain("tool-result");
+
+    // Verify message is no longer streaming
+    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0);
   });
 
-  test("should support message querying by data-message-id", async ({ context, extensionId }) => {
+  test("should stream simple text without tool calls", async ({ context, extensionId }) => {
+    // Configure the extension first
+    const optionsPage = await context.newPage();
+    await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
+    await optionsPage.locator("#endpoint-input").fill("http://localhost:1234/v1/chat/completions");
+    await optionsPage.locator("#model-input").fill("qwen/qwen3-coder-30b");
+    await optionsPage.waitForTimeout(2000); // Wait for auto-save
+
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
-    // Test that querySelector works with data-message-id attributes
-    const queryTest = await sidepanelPage.evaluate(() => {
-      const messagesContainer = document.getElementById("messages");
-      if (!messagesContainer) return false;
+    // Send a simple message that shouldn't trigger tools
+    const messageInput = sidepanelPage.locator("#message-input");
+    await messageInput.fill(
+      "Just say hello and explain what you are in a few sentences. No tools needed.",
+    );
 
-      // Add multiple test messages
-      for (let i = 1; i <= 3; i++) {
-        const messageElement = document.createElement("div");
-        messageElement.className = "message user";
-        messageElement.dataset.messageId = `test-msg-${i}`;
-        messageElement.innerHTML = `Message ${i}`;
-        messagesContainer.appendChild(messageElement);
-      }
+    const sendBtn = sidepanelPage.locator("#send-btn");
+    await sendBtn.click();
 
-      // Test querying specific messages
-      const msg1 = messagesContainer.querySelector('[data-message-id="test-msg-1"]');
-      const msg2 = messagesContainer.querySelector('[data-message-id="test-msg-2"]');
-      const msg3 = messagesContainer.querySelector('[data-message-id="test-msg-3"]');
-      const nonExistent = messagesContainer.querySelector('[data-message-id="test-msg-999"]');
-
-      return (
-        msg1 &&
-        msg2 &&
-        msg3 &&
-        !nonExistent &&
-        (msg1 as HTMLElement).innerHTML === "Message 1" &&
-        (msg2 as HTMLElement).innerHTML === "Message 2" &&
-        (msg3 as HTMLElement).innerHTML === "Message 3"
-      );
+    // Wait for streaming to start
+    await expect(sidepanelPage.locator(".message.assistant.streaming")).toBeVisible({
+      timeout: 10000,
     });
 
-    expect(queryTest).toBe(true);
-  });
-
-  test("should handle storage listener for real-time updates", async ({ context, extensionId }) => {
-    const sidepanelPage = await context.newPage();
-    await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-
-    // Verify that storage change listener is set up
-    const storageListenerExists = await sidepanelPage.evaluate(() => {
-      // Check if browser.storage.onChanged listener exists
-      return (
-        typeof window.chrome !== "undefined" &&
-        typeof window.chrome.storage !== "undefined" &&
-        typeof (window as any).chrome.storage.onChanged !== "undefined"
-      );
+    // Wait for streaming to complete
+    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0, {
+      timeout: 15000,
     });
 
-    expect(storageListenerExists).toBe(true);
+    // Verify final message
+    const finalMessage = await sidepanelPage.locator(".message.assistant").last();
+    const finalContent = await finalMessage.textContent();
+
+    expect(finalContent).toMatch(/(hello|assistant|AI)/i);
+    expect(finalContent).not.toContain("tool-call");
+    expect(finalContent).not.toContain("tool-result");
   });
 });
