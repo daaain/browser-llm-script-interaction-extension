@@ -6,7 +6,6 @@ Roadmap / TODO:
 - see chat history
 - do actions
 - save complex function call sequence into action scripts
-- remove clear()
 - system prompt with and without tools
 - tool parameters to choose number of items / length to return, paging, and reporting how much there is
 - replace function test buttons with full list of functions and way to manually call any of them

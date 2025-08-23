@@ -38,5 +38,17 @@
     "vitest": "^3.2.4",
     "webextension-polyfill": "^0.12.0",
     "wxt": "^0.20.8"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.19",
+    "@ai-sdk/openai-compatible": "^1.0.11",
+    "@ai-sdk/react": "^2.0.22",
+    "@ai-sdk/ui-utils": "^1.2.11",
+    "@types/react": "^19.1.11",
+    "@types/react-dom": "^19.1.7",
+    "ai": "^5.0.22",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^3.25.76"
   }
 }

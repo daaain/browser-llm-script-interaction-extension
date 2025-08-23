@@ -17,6 +17,7 @@ test.describe("Manual Streaming Test", () => {
   test("should manually configure extension and test streaming with network capture", async ({
     context,
     extensionId,
+    consoleLogs,
   }) => {
     // Create results directory if it doesn't exist
     if (!fs.existsSync("test-results")) {
@@ -54,7 +55,7 @@ test.describe("Manual Streaming Test", () => {
               status: responseData.status,
               bodyLength: responseText.length,
               bodyPreview:
-                responseText.substring(0, 200) + (responseText.length > 200 ? "..." : ""),
+                responseText.substring(0, 500) + (responseText.length > 500 ? "..." : ""),
             });
           } catch (error) {
             responseData.body = `[Failed to read body: ${error.message}]`;
@@ -86,8 +87,21 @@ test.describe("Manual Streaming Test", () => {
 
     // Configure LM Studio settings
     await optionsPage.locator("#endpoint-input").fill("http://localhost:1234/v1/chat/completions");
-    await optionsPage.locator("#model-input").fill("qwen/qwen3-coder-30b");
-    await optionsPage.locator("#tools-enabled").check();
+    await optionsPage.locator("#model-input").fill("local-model");
+
+    // Enable tools - try multiple approaches
+    try {
+      const toolsCheckbox = optionsPage.locator("#tools-enabled");
+      const isChecked = await toolsCheckbox.isChecked();
+      if (!isChecked) {
+        await toolsCheckbox.click();
+        console.log("✅ Tools checkbox clicked");
+      } else {
+        console.log("✅ Tools checkbox already checked");
+      }
+    } catch (e: any) {
+      console.log("⚠️ Could not interact with tools checkbox:", e.message);
+    }
 
     // Wait for auto-save
     await optionsPage.waitForTimeout(2000);
@@ -109,6 +123,9 @@ test.describe("Manual Streaming Test", () => {
     await expect(sidepanelPage.locator("#message-input")).toBeVisible({ timeout: 5000 });
     await expect(sidepanelPage.locator("#send-btn")).toBeVisible({ timeout: 5000 });
 
+    // Debug panel removed - now relying on console logs only
+    console.log("✅ Using console logs for debugging");
+
     console.log("🚀 Starting test with network capture enabled...");
 
     // Test 1: Simple message without tools
@@ -127,12 +144,25 @@ test.describe("Manual Streaming Test", () => {
     const firstResponse = await sidepanelPage.locator(".message.assistant").textContent();
     console.log("✅ First response received:", firstResponse?.substring(0, 100));
 
-    // Test 2: Message with text-based tool calls that should work
-    console.log("📝 Test 2: Message with text-based tool calls");
+    // Take screenshot after first message
+    await sidepanelPage.screenshot({ path: "test-results/after-first-message.png" });
+
+    // Test 2: Multi-turn tool calls test
+    console.log("📝 Test 2: Multi-turn tool calls test - find and analyze scenario");
+
+    // First, let's navigate to our local test page with interactive elements
+    const testPage = await context.newPage();
+    await testPage.goto(`chrome-extension://${extensionId}/test-page.html`);
+    await testPage.waitForLoadState("networkidle");
+
+    // Make sure the sidepanel can see the test page by switching focus
+    await testPage.bringToFront();
+    await sidepanelPage.bringToFront();
+
     await sidepanelPage
       .locator("#message-input")
       .fill(
-        "Please find an element with text 'Example' on the current page and click it. Then get the page summary. Use the findElement and click tools.",
+        "I need you to use your tools to interact with the current page. Please: 1) Use the 'find' tool to locate download buttons on the page, 2) Use the 'click' tool to click a download button, 3) Use the 'type' tool to enter 'test@example.com' in the email input field. Be sure to actually use the tools, don't just describe what you would do.",
       );
     await sidepanelPage.locator("#send-btn").click();
 
@@ -175,21 +205,94 @@ test.describe("Manual Streaming Test", () => {
     // Save all captured API responses
     fs.writeFileSync("test-results/all-api-responses.json", JSON.stringify(apiResponses, null, 2));
 
+    // Save console logs
+    fs.writeFileSync("test-results/console-logs.txt", consoleLogs.join("\n"));
+
     console.log(`📊 Test completed. Captured ${apiResponses.length} API responses.`);
     console.log(`💬 Final conversation has ${allMessages.length} messages.`);
+    console.log(`📋 Console logs captured: ${consoleLogs.length} entries.`);
 
-    // Analyze the responses
+    // Analyze the responses for multi-turn tool calling
     const hasToolCalls = toolResponse.includes("tool-call");
     const hasToolResults = toolResponse.includes("tool-result");
     const hasAssistantText = toolResponse.includes("assistant-text");
+    const multipleAPIResponses = apiResponses.length > 1;
 
     console.log(`🔧 Tool calls present: ${hasToolCalls}`);
     console.log(`📋 Tool results present: ${hasToolResults}`);
     console.log(`💬 Assistant text present: ${hasAssistantText}`);
+    console.log(`🔄 Multiple API calls (multi-turn): ${multipleAPIResponses}`);
 
-    // Basic assertions
-    expect(apiResponses.length).toBeGreaterThan(0);
-    expect(toolResponse.length).toBeGreaterThan(10);
-    expect(allMessages.length).toBeGreaterThan(2);
+    // Analyze API responses for multi-turn pattern
+    const toolRelatedResponses = apiResponses.filter(
+      (resp) => resp.body && (resp.body.includes("tool") || resp.body.includes("function")),
+    );
+    console.log(`🛠️ Tool-related API responses: ${toolRelatedResponses.length}`);
+
+    // Log first few API responses for debugging
+    apiResponses.slice(0, 3).forEach((resp, i) => {
+      console.log(`📡 API Response ${i + 1}:`, {
+        url: resp.url,
+        status: resp.status,
+        bodyPreview: resp.body?.substring(0, 200),
+      });
+    });
+
+    // STRICT assertions for multi-round tool calling - test must FAIL unless these are met
+    console.log("🔬 Starting strict multi-round tool calling assertions...");
+    
+    // 1. REQUIRE multiple API rounds (each tool call should trigger a new API call)
+    expect(apiResponses.length).toBeGreaterThanOrEqual(2);
+    console.log(`✅ Multiple API rounds: ${apiResponses.length} >= 2`);
+    
+    // 2. REQUIRE actual tool calls in UI (must have tool-call divs)
+    expect(hasToolCalls).toBeTruthy();
+    console.log(`✅ Tool calls in UI: ${hasToolCalls}`);
+    
+    // 3. REQUIRE actual tool results in UI (must have tool-result divs)  
+    expect(hasToolResults).toBeTruthy();
+    console.log(`✅ Tool results in UI: ${hasToolResults}`);
+    
+    // 4. Count actual tool call elements in the response
+    const toolCallMatches = (toolResponse.match(/tool-call/g) || []).length;
+    const toolResultMatches = (toolResponse.match(/tool-result/g) || []).length;
+    
+    console.log(`🔧 Tool call elements found: ${toolCallMatches}`);
+    console.log(`📋 Tool result elements found: ${toolResultMatches}`);
+    
+    // 5. REQUIRE at least 2 different tools were called (find + click or find + type)
+    expect(toolCallMatches).toBeGreaterThanOrEqual(2);
+    expect(toolResultMatches).toBeGreaterThanOrEqual(2);
+    
+    // 6. REQUIRE specific tool names in the actual tool calls
+    const hasFindTool = toolResponse.includes("find(") || consoleLogs.some(log => log.includes("find("));
+    const hasClickTool = toolResponse.includes("click(") || consoleLogs.some(log => log.includes("click("));
+    const hasTypeTool = toolResponse.includes("type(") || consoleLogs.some(log => log.includes("type("));
+    
+    console.log(`🔍 Find tool used: ${hasFindTool}`);
+    console.log(`👆 Click tool used: ${hasClickTool}`);
+    console.log(`⌨️  Type tool used: ${hasTypeTool}`);
+    
+    // Require at least 2 of the 3 tools were actually used
+    const toolsUsed = [hasFindTool, hasClickTool, hasTypeTool].filter(Boolean).length;
+    expect(toolsUsed).toBeGreaterThanOrEqual(2);
+    console.log(`✅ Tools used: ${toolsUsed} >= 2`);
+
+    // 7. REQUIRE tool-related API responses (actual tool calls in API)
+    expect(toolRelatedResponses.length).toBeGreaterThanOrEqual(1);
+    console.log(`✅ Tool-related API responses: ${toolRelatedResponses.length} >= 1`);
+
+    // 8. REQUIRE conversation length indicates multi-turn
+    expect(allMessages.length).toBeGreaterThanOrEqual(3); // user msg + assistant response with tools
+    console.log(`✅ Conversation length: ${allMessages.length} >= 3`);
+
+    // Additional test: verify the extension didn't crash
+    const errorLogs = consoleLogs.filter((log) => log.includes("ERROR") || log.includes("error"));
+    if (errorLogs.length > 0) {
+      console.log("⚠️ Error logs found:", errorLogs.slice(0, 5));
+    }
+
+    // Should have some tool-related activity but not excessive errors
+    expect(errorLogs.length).toBeLessThan(10); // Allow some minor errors but not excessive
   });
 });
