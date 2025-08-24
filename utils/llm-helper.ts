@@ -131,6 +131,9 @@ export function createLLMHelper(): LLMHelperInterface {
     if (element instanceof HTMLTextAreaElement) {
       return element.value || element.placeholder || "";
     }
+    if (element instanceof HTMLElement) {
+      return element.innerText || "";
+    }
     return element.textContent?.trim() || "";
   }
 
@@ -291,6 +294,13 @@ export function createLLMHelper(): LLMHelperInterface {
           return `No element found matching selector: ${selector}`;
         }
         
+        // Check if element is a button and reject
+        if (element instanceof HTMLButtonElement ||
+            (element instanceof HTMLInputElement && (element.type === 'submit' || element.type === 'button')) ||
+            element.getAttribute('role') === 'button') {
+          return `Cannot type into button element: ${element.tagName.toLowerCase()}`;
+        }
+        
         // Focus the element
         if (element instanceof HTMLElement) {
           element.focus();
@@ -336,21 +346,21 @@ export function createLLMHelper(): LLMHelperInterface {
           
           if (property) {
             if (property === "innerText") {
-              return element.textContent?.trim() || "";
+              return applyResponseTruncation(element.textContent?.trim() || "");
             }
             if (property === "value" && element instanceof HTMLInputElement) {
-              return element.value;
+              return applyResponseTruncation(element.value);
             }
             if (property.startsWith("data-")) {
-              return element.getAttribute(property) || "";
+              return applyResponseTruncation(element.getAttribute(property) || "");
             }
             if (property === "href" && element instanceof HTMLAnchorElement) {
-              return element.href;
+              return applyResponseTruncation(element.href);
             }
-            return element.getAttribute(property) || "";
+            return applyResponseTruncation(element.getAttribute(property) || "");
           }
           
-          return getElementText(element);
+          return applyResponseTruncation(getElementText(element));
         }
         
         // Extract all visible text from the page

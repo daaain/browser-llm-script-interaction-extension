@@ -392,8 +392,8 @@ const ChatInterface: React.FC = () => {
       <header className="chat-header">
         <h1>LLM Chat</h1>
         <div className="header-buttons">
-          <button onClick={clearChat} className="clear-btn" title="Clear Chat">🗑️</button>
-          <button onClick={openSettings} className="settings-btn" title="Open Settings">⚙️</button>
+          <button id="clear-btn" onClick={clearChat} className="clear-btn" title="Clear Chat">🗑️</button>
+          <button id="settings-btn" onClick={openSettings} className="settings-btn" title="Open Settings">⚙️</button>
         </div>
       </header>
 
@@ -445,9 +445,9 @@ const ChatInterface: React.FC = () => {
 
       <div className="test-controls">
         <h4>Test LLMHelper Functions:</h4>
-        <button onClick={() => testFunction('summary', {})} className="test-btn">Test Summary</button>
-        <button onClick={() => testFunction('extract', {})} className="test-btn">Test Extract</button>
-        <button onClick={() => testFunction('find', { pattern: 'button|download|save', options: { limit: 5 } })} className="test-btn">Test Find Buttons</button>
+        <button id="test-summary" onClick={() => testFunction('summary', {})} className="test-btn">Test Summary</button>
+        <button id="test-extract" onClick={() => testFunction('extract', {})} className="test-btn">Test Extract</button>
+        <button id="test-find" onClick={() => testFunction('find', { pattern: 'button|download|save', options: { limit: 5 } })} className="test-btn">Test Find Buttons</button>
       </div>
 
       <div className="input-container">

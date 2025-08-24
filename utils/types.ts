@@ -71,12 +71,12 @@ export interface LLMTool {
 
 
 export interface MessageFromSidebar {
-  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS" | "EXECUTE_FUNCTION" | "CLEAR_TAB_CONVERSATION" | "CAPTURE_SCREENSHOT";
+  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS" | "EXECUTE_FUNCTION" | "CLEAR_TAB_CONVERSATION" | "CAPTURE_SCREENSHOT" | "TEST_CONNECTION";
   payload: any;
 }
 
 export interface MessageToSidebar {
-  type: "MESSAGE_RESPONSE" | "SETTINGS_RESPONSE" | "ERROR" | "FUNCTION_RESPONSE";
+  type: "MESSAGE_RESPONSE" | "SETTINGS_RESPONSE" | "ERROR" | "FUNCTION_RESPONSE" | "TEST_CONNECTION_RESPONSE";
   payload: any;
 }
 
@@ -92,17 +92,6 @@ export interface ContentScriptFunctionResponse {
   error?: string;
 }
 
-// Re-export AI SDK types for use throughout the application
-export type { 
-  UIMessage,
-  ModelMessage, 
-  TextPart,
-  ToolCallPart,
-  ToolResultPart,
-  ImagePart,
-  FilePart
-} from 'ai';
-
 // AI SDK tool call structure (based on internal AI SDK types)
 export interface AISDKToolCall {
   type: 'tool-call';
@@ -115,15 +104,6 @@ export interface AISDKToolCall {
   error?: unknown;
 }
 
-// Extended types for AI SDK integration
-// ExtendedUIMessage removed - using ChatMessage instead
-
-// Migration support - indicates which message format to use
-export interface MigrationConfig {
-  useAISDK: boolean;
-  enableBackwardsCompatibility: boolean;
-}
-
 // Updated ExtensionSettings to support both message formats
 export interface ExtensionSettings {
   provider: LLMProvider;
@@ -132,15 +112,6 @@ export interface ExtensionSettings {
   truncationLimit: number;
   tabConversations?: { [tabId: string]: ChatMessage[] };
   toolsEnabled: boolean;
-  // Migration settings
-  migrationConfig?: MigrationConfig;
-  // AI SDK specific settings
-  aiSDKSettings?: {
-    enableStreaming: boolean;
-    maxToolRounds: number;
-    temperature?: number;
-    maxTokens?: number;
-  };
 }
 
 export const DEFAULT_PROVIDERS: Omit<LLMProvider, "apiKey">[] = [
@@ -165,17 +136,3 @@ export const DEFAULT_PROVIDERS: Omit<LLMProvider, "apiKey">[] = [
     model: "",
   },
 ];
-
-// Default migration configuration
-export const DEFAULT_MIGRATION_CONFIG: MigrationConfig = {
-  useAISDK: true, // Enable AI SDK by default for new installations
-  enableBackwardsCompatibility: true, // Support reading old message formats
-};
-
-// Default AI SDK settings
-export const DEFAULT_AI_SDK_SETTINGS = {
-  enableStreaming: true,
-  maxToolRounds: 10,
-  temperature: 0.7,
-  maxTokens: 4096,
-};

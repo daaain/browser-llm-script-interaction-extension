@@ -2,7 +2,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LLMService } from "../../utils/llm-service";
 import type { ChatMessage, LLMProvider } from "../../utils/types";
 
-global.fetch = vi.fn();
+// Mock the AI SDK
+vi.mock("ai", () => ({
+  streamText: vi.fn(),
+  convertToModelMessages: vi.fn((messages) => messages),
+  stepCountIs: vi.fn(),
+}));
+
+// Mock available tools
+vi.mock("../../utils/ai-tools", () => ({
+  availableTools: [],
+}));
+
+// Mock background logger
+vi.mock("../../utils/debug-logger", () => ({
+  backgroundLogger: {
+    info: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
 
 describe("LLMService", () => {
   let llmService: LLMService;
@@ -24,8 +44,9 @@ describe("LLMService", () => {
     vi.resetAllMocks();
   });
 
-  describe("sendMessage", () => {
-    it("should send a message and return a response", async () => {
+  describe("streamMessage", () => {
+    it("should call streamMessage with correct parameters", async () => {
+      const { streamText } = await import("ai");
       const mockMessages: ChatMessage[] = [
         {
           id: "1",
@@ -35,103 +56,59 @@ describe("LLMService", () => {
         },
       ];
 
-      const streamChunks = [
-        'data: {"choices":[{"delta":{"content":"Hello! "}}]}\n\n',
-        'data: {"choices":[{"delta":{"content":"How can "}}]}\n\n',
-        'data: {"choices":[{"delta":{"content":"I help you today?"}}]}\n\n',
-        "data: [DONE]\n\n",
-      ];
+      const mockOnChunk = vi.fn();
+      const mockOnComplete = vi.fn();
+      const mockOnError = vi.fn();
 
-      const mockStream = new ReadableStream({
-        start(controller) {
-          streamChunks.forEach((chunk) => {
-            controller.enqueue(new TextEncoder().encode(chunk));
-          });
-          controller.close();
+      // Mock streamText to simulate successful streaming
+      const mockTextStream = {
+        async *[Symbol.asyncIterator]() {
+          yield "Hello! ";
+          yield "How can ";
+          yield "I help you?";
         },
-      });
-
-      (fetch as any).mockResolvedValueOnce({
-        ok: true,
-        body: mockStream,
-      });
-
-      const result = await llmService.sendMessage(mockMessages);
-
-      expect(fetch).toHaveBeenCalledWith(mockProvider.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${mockProvider.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: mockProvider.model,
-          messages: [{ role: "user", content: "Hello" }],
-          temperature: 0.7,
-          max_tokens: 2000,
-          stream: true,
-        }),
-        mode: "cors",
-      });
-
-      expect(result).toEqual({
-        content: "Hello! How can I help you today?",
-      });
-    });
-
-    it("should handle API errors", async () => {
-      const mockMessages: ChatMessage[] = [
-        {
-          id: "1",
-          role: "user",
-          content: "Hello",
-          timestamp: Date.now(),
-        },
-      ];
-
-      (fetch as any).mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        statusText: "Unauthorized",
-      });
-
-      const result = await llmService.sendMessage(mockMessages);
-
-      expect(result).toEqual({
-        content: "",
-        error: "HTTP 401: Unauthorized",
-      });
-    });
-
-    it("should handle network errors", async () => {
-      const mockMessages: ChatMessage[] = [
-        {
-          id: "1",
-          role: "user",
-          content: "Hello",
-          timestamp: Date.now(),
-        },
-      ];
-
-      (fetch as any).mockRejectedValueOnce(new Error("Network error"));
-
-      const result = await llmService.sendMessage(mockMessages);
-
-      expect(result).toEqual({
-        content: "",
-        error: "Network error",
-      });
-    });
-
-    it("should work without API key for local models", async () => {
-      const providerWithoutKey: LLMProvider = {
-        name: "Local Provider",
-        endpoint: "http://localhost:1234/v1/chat/completions",
-        model: "local-model",
       };
 
-      llmService = new LLMService(providerWithoutKey);
+      const mockResult = {
+        textStream: mockTextStream,
+        text: Promise.resolve("Hello! How can I help you?"),
+        finishReason: Promise.resolve("stop"),
+        usage: Promise.resolve({ promptTokens: 10, completionTokens: 20 }),
+        response: Promise.resolve({}),
+      };
 
+      (streamText as any).mockReturnValue(mockResult);
+
+      await llmService.streamMessage(mockMessages, mockOnChunk, mockOnComplete, mockOnError, false);
+
+      expect(streamText).toHaveBeenCalledWith({
+        model: expect.any(Object),
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                type: "text",
+                text: "Hello",
+              }),
+            ]),
+          }),
+        ]),
+        temperature: 0.1,
+      });
+
+      // Wait a bit for async iteration to complete
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(mockOnChunk).toHaveBeenCalledWith("Hello! ");
+      expect(mockOnChunk).toHaveBeenCalledWith("Hello! How can ");
+      expect(mockOnChunk).toHaveBeenCalledWith("Hello! How can I help you?");
+      expect(mockOnComplete).toHaveBeenCalledWith("Hello! How can I help you?", [], []);
+      expect(mockOnError).not.toHaveBeenCalled();
+    });
+
+    it("should handle streaming errors", async () => {
+      const { streamText } = await import("ai");
       const mockMessages: ChatMessage[] = [
         {
           id: "1",
@@ -141,51 +118,180 @@ describe("LLMService", () => {
         },
       ];
 
-      const streamChunks = [
-        'data: {"choices":[{"delta":{"content":"Hello "}}]}\n\n',
-        'data: {"choices":[{"delta":{"content":"from local model!"}}]}\n\n',
-        "data: [DONE]\n\n",
+      const mockOnChunk = vi.fn();
+      const mockOnComplete = vi.fn();
+      const mockOnError = vi.fn();
+
+      // Mock streamText to simulate an error in streaming
+      const mockTextStream = {
+        async *[Symbol.asyncIterator]() {
+          yield ""; // Add yield to satisfy linter
+          throw new Error("Network error");
+        },
+      };
+
+      const mockResult = {
+        textStream: mockTextStream,
+        text: Promise.resolve(""),
+        finishReason: Promise.resolve("stop"),
+        usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
+        response: Promise.resolve({}),
+      };
+
+      (streamText as any).mockReturnValue(mockResult);
+
+      await llmService.streamMessage(mockMessages, mockOnChunk, mockOnComplete, mockOnError, false);
+
+      expect(mockOnError).toHaveBeenCalledWith("Network error");
+      expect(mockOnComplete).not.toHaveBeenCalled();
+    });
+
+    it("should include tools when enabled", async () => {
+      const { streamText } = await import("ai");
+      const mockMessages: ChatMessage[] = [
+        {
+          id: "1",
+          role: "user",
+          content: "Hello",
+          timestamp: Date.now(),
+        },
       ];
 
-      const mockStream = new ReadableStream({
-        start(controller) {
-          streamChunks.forEach((chunk) => {
-            controller.enqueue(new TextEncoder().encode(chunk));
-          });
-          controller.close();
+      const mockOnChunk = vi.fn();
+      const mockOnComplete = vi.fn();
+      const mockOnError = vi.fn();
+
+      // Mock streamText
+      const mockTextStream = {
+        async *[Symbol.asyncIterator]() {
+          yield "Hello!";
         },
+      };
+
+      const mockResult = {
+        textStream: mockTextStream,
+        text: Promise.resolve("Hello!"),
+        finishReason: Promise.resolve("stop"),
+        usage: Promise.resolve({ promptTokens: 10, completionTokens: 5 }),
+        response: Promise.resolve({}),
+      };
+
+      (streamText as any).mockReturnValue(mockResult);
+
+      await llmService.streamMessage(
+        mockMessages,
+        mockOnChunk,
+        mockOnComplete,
+        mockOnError,
+        true, // Enable tools
+      );
+
+      expect(streamText).toHaveBeenCalledWith({
+        model: expect.any(Object),
+        messages: expect.any(Array),
+        temperature: 0.1,
+        tools: expect.any(Array),
       });
+    });
+  });
 
-      (fetch as any).mockResolvedValueOnce({
-        ok: true,
-        body: mockStream,
-      });
+  describe("testConnection", () => {
+    it("should return success when streaming works", async () => {
+      const { streamText } = await import("ai");
 
-      const result = await llmService.sendMessage(mockMessages);
-
-      expect(fetch).toHaveBeenCalledWith(providerWithoutKey.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // Mock successful streaming
+      const mockTextStream = {
+        async *[Symbol.asyncIterator]() {
+          yield "Connection test response";
         },
-        body: JSON.stringify({
-          model: providerWithoutKey.model,
-          messages: [{ role: "user", content: "Hello" }],
-          temperature: 0.7,
-          max_tokens: 2000,
-          stream: true,
-        }),
-        mode: "cors",
-      });
+      };
+
+      const mockResult = {
+        textStream: mockTextStream,
+        text: Promise.resolve("Connection test response"),
+        finishReason: Promise.resolve("stop"),
+        usage: Promise.resolve({ promptTokens: 10, completionTokens: 5 }),
+        response: Promise.resolve({}),
+      };
+
+      (streamText as any).mockReturnValue(mockResult);
+
+      const result = await llmService.testConnection();
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it("should return failure when streaming fails", async () => {
+      const { streamText } = await import("ai");
+
+      // Mock streaming failure
+      const mockTextStream = {
+        async *[Symbol.asyncIterator]() {
+          yield ""; // Add yield to satisfy linter
+          throw new Error("Connection failed");
+        },
+      };
+
+      const mockResult = {
+        textStream: mockTextStream,
+        text: Promise.resolve(""),
+        finishReason: Promise.resolve("stop"),
+        usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
+        response: Promise.resolve({}),
+      };
+
+      (streamText as any).mockReturnValue(mockResult);
+
+      const result = await llmService.testConnection();
 
       expect(result).toEqual({
-        content: "Hello from local model!",
+        success: false,
+        error: "Connection failed",
+      });
+    });
+
+    it("should test with correct message format", async () => {
+      const { streamText } = await import("ai");
+
+      // Mock successful streaming
+      const mockTextStream = {
+        async *[Symbol.asyncIterator]() {
+          yield "Hello";
+        },
+      };
+
+      const mockResult = {
+        textStream: mockTextStream,
+        text: Promise.resolve("Hello"),
+        finishReason: Promise.resolve("stop"),
+        usage: Promise.resolve({ promptTokens: 10, completionTokens: 5 }),
+        response: Promise.resolve({}),
+      };
+
+      (streamText as any).mockReturnValue(mockResult);
+
+      await llmService.testConnection();
+
+      expect(streamText).toHaveBeenCalledWith({
+        model: expect.any(Object),
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                type: "text",
+                text: expect.stringContaining("connection test"),
+              }),
+            ]),
+          }),
+        ]),
+        temperature: 0.1,
       });
     });
   });
 
   describe("updateProvider", () => {
-    it("should update the provider", () => {
+    it("should update the model when using custom endpoint", () => {
       const newProvider: LLMProvider = {
         name: "New Provider",
         endpoint: "http://new-endpoint.com/v1/chat/completions",
@@ -195,7 +301,24 @@ describe("LLMService", () => {
 
       llmService.updateProvider(newProvider);
 
-      expect((llmService as any).provider).toEqual(newProvider);
+      // Check that model was created (it should be defined and have the correct modelId)
+      expect((llmService as any).model).toBeDefined();
+      expect((llmService as any).model.modelId).toBe("new-model");
+    });
+
+    it("should create OpenAI model when using OpenAI endpoint", () => {
+      const openaiProvider: LLMProvider = {
+        name: "OpenAI",
+        endpoint: "https://api.openai.com/v1/chat/completions",
+        model: "gpt-4",
+        apiKey: "sk-test",
+      };
+
+      llmService.updateProvider(openaiProvider);
+
+      // Check that model was created
+      expect((llmService as any).model).toBeDefined();
+      expect((llmService as any).model.modelId).toBe("gpt-4");
     });
   });
 });

@@ -40,10 +40,10 @@ export const test = base.extend<{
   },
   consoleLogs: async ({ context }, use) => {
     const logs: string[] = [];
-    
+
     // Listen for console events on all pages
-    context.on('page', (page) => {
-      page.on('console', (msg) => {
+    context.on("page", (page) => {
+      page.on("console", (msg) => {
         const timestamp = new Date().toISOString();
         const logEntry = `[${timestamp}] ${msg.type()}: ${msg.text()}`;
         logs.push(logEntry);
@@ -51,10 +51,10 @@ export const test = base.extend<{
         console.log(`📱 Extension Console: ${logEntry}`);
       });
     });
-    
+
     // Listen for existing pages
     for (const page of context.pages()) {
-      page.on('console', (msg) => {
+      page.on("console", (msg) => {
         const timestamp = new Date().toISOString();
         const logEntry = `[${timestamp}] ${msg.type()}: ${msg.text()}`;
         logs.push(logEntry);

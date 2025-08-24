@@ -1,8 +1,5 @@
 import { 
   streamText, 
-  generateText, 
-  generateObject, 
-  streamObject,
   convertToModelMessages,
   stepCountIs
 } from 'ai';
@@ -179,7 +176,7 @@ export class LLMService {
         const result = streamText({
           model: this.model,
           messages: modelMessages,
-          temperature: 0.7,
+          temperature: 0.1,
         });
 
         let fullText = '';
@@ -231,8 +228,8 @@ export class LLMService {
         model: this.model,
         messages: modelMessages,
         tools: availableTools,
-        temperature: 0.7,
-        stopWhen: stepCountIs(5)
+        temperature: 0.1,
+        stopWhen: stepCountIs(10)
       });
 
       backgroundLogger.info('AI SDK streaming started');
@@ -307,82 +304,55 @@ export class LLMService {
     }
   }
 
-  /**
-   * Send a non-streaming message with proper tool call handling
-   */
-  async generateMessage(
-    messages: any[],
-    enableTools: boolean = false
-  ): Promise<{
-    text: string;
-    toolCalls?: any[];
-    toolResults?: any[];
-    error?: string;
-  }> {
-    try {
-      backgroundLogger.info('Generate message - converting messages', { messageCount: messages?.length || 0, messageType: typeof messages });
-      
-      if (!messages || !Array.isArray(messages)) {
-        throw new Error('messages is not an array: ' + typeof messages);
-      }
-      
-      const uiMessages = this.convertToUIMessages(messages);
-      const modelMessages = convertToModelMessages(uiMessages);
-      
-      const generateConfig: any = {
-        model: this.model,
-        messages: modelMessages,
-        temperature: 0.7,
-      };
-      
-      if (enableTools) {
-        generateConfig.tools = availableTools;
-      }
-      
-      const result = await generateText(generateConfig);
-
-      backgroundLogger.debug('AI SDK generateMessage result', {
-        text: result.text.substring(0, 200)
-      });
-
-      return {
-        text: result.text
-      };
-
-    } catch (error) {
-      backgroundLogger.error('AI SDK generate error', { error });
-      return {
-        text: '',
-        error: error instanceof Error ? error.message : 'Unknown generation error'
-      };
-    }
-  }
 
   /**
-   * Test the connection
+   * Test the connection using streaming (what we actually use)
    */
   async testConnection(): Promise<{ success: boolean; error?: string }> {
-    try {
+    return new Promise((resolve) => {
+      let resolved = false;
+      
+      // Set a timeout for the test
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ success: false, error: 'Connection test timeout' });
+        }
+      }, 30000); // 30 second timeout
+
       const testMessages = [
         {
           role: 'user',
-          content: 'Hello, this is a connection test. Please respond with "Connection successful".'
+          content: 'Hello, this is a connection test. Please respond briefly.'
         }
       ];
 
-      const result = await this.generateMessage(testMessages, false);
-      
-      if (result.error) {
-        return { success: false, error: result.error };
-      }
-
-      return { success: true };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Connection test failed'
-      };
-    }
+      this.streamMessage(
+        testMessages,
+        (_chunk: string) => {
+          // If we receive any chunk, the connection is working
+        },
+        (fullText: string) => {
+          // On successful completion
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            backgroundLogger.debug('Test connection successful', { responseLength: fullText.length });
+            resolve({ success: true });
+          }
+        },
+        (error: string) => {
+          // On error
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            backgroundLogger.debug('Test connection failed', { error });
+            resolve({ success: false, error });
+          }
+        },
+        false // No tools for connection test
+      );
+    });
   }
 }
 

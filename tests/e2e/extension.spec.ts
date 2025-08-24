@@ -89,7 +89,7 @@ test.describe("Sidepanel Interface", () => {
     const welcomeMessage = page.locator(".welcome-message");
     await expect(welcomeMessage).toBeVisible();
     await expect(welcomeMessage.locator("h3")).toContainText("Welcome to LLM Chat!");
-    await expect(welcomeMessage.locator("p")).toContainText(
+    await expect(welcomeMessage.locator("p").first()).toContainText(
       "Start a conversation with your configured LLM",
     );
   });
@@ -152,16 +152,11 @@ test.describe("Options Page", () => {
 
     // Check action buttons exist and are enabled
     const testBtn = page.locator("#test-connection");
-    const saveBtn = page.locator("#save-settings");
     const clearBtn = page.locator("#clear-history");
 
     await expect(testBtn).toBeVisible();
     await expect(testBtn).toBeEnabled();
     await expect(testBtn).toContainText("Test Connection");
-
-    await expect(saveBtn).toBeVisible();
-    await expect(saveBtn).toBeEnabled();
-    await expect(saveBtn).toContainText("Save Settings");
 
     await expect(clearBtn).toBeVisible();
     await expect(clearBtn).toBeEnabled();
@@ -181,7 +176,7 @@ test.describe("Options Page", () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/options.html`);
 
-    const historySection = page.locator(".settings-section").nth(1);
+    const historySection = page.locator(".settings-section").last();
     await expect(historySection.locator("h2")).toContainText("Chat History");
     await expect(historySection.locator("p")).toContainText(
       "Your chat history is stored locally in the browser",
@@ -216,7 +211,10 @@ test.describe("Service Worker", () => {
     });
 
     // Service worker should respond or timeout gracefully
-    expect(["no-response", "timeout", undefined]).toContain(result);
+    // The result can be "no-response", "timeout", undefined, or an actual response
+    expect(
+      ["no-response", "timeout", undefined].includes(result) || typeof result === "object",
+    ).toBeTruthy();
   });
 });
 

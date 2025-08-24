@@ -10,51 +10,18 @@ test.describe("Debug Messaging", () => {
     }
   });
 
-  test("should load content script on test pages", async ({ context }) => {
-    // Create a test page
+  test("should verify extension pages load correctly", async ({ context, extensionId }) => {
+    // Test that the built test page loads (content scripts don't inject into extension pages)
     const testPage = await context.newPage();
-    await testPage.setContent(`
-      <html>
-        <body>
-          <h1>Test Page</h1>
-          <p>Content for testing</p>
-        </body>
-      </html>
-    `);
+    await testPage.goto(`chrome-extension://${extensionId}/test-page.html`);
 
-    // Wait longer for content script to load
-    await testPage.waitForTimeout(3000);
+    // Verify page loads
+    await expect(testPage).toHaveTitle("Extension Test Page");
 
-    // Check if LLMHelper is available
-    const llmHelperExists = await testPage.evaluate(() => {
-      return typeof (window as any).LLMHelper !== "undefined";
-    });
-
-    console.log("LLMHelper exists:", llmHelperExists);
-
-    // Check if content script console messages appear
-    const scriptLoaded = await testPage.evaluate(() => {
-      // Look for any signs that content script loaded
-      return document.body && document.head;
-    });
-
-    expect(scriptLoaded).toBe(true);
-
-    // Try to access LLMHelper directly
-    const helperTest = await testPage.evaluate(() => {
-      try {
-        const helper = (window as any).LLMHelper;
-        if (!helper) return { loaded: false, error: "LLMHelper not found" };
-
-        // Try a basic function
-        const result = helper.summary();
-        return { loaded: true, summaryType: typeof result, summary: result };
-      } catch (error) {
-        return { loaded: false, error: error instanceof Error ? error.message : String(error) };
-      }
-    });
-
-    console.log("Helper test result:", helperTest);
+    // Verify page content
+    await expect(testPage.locator("h1")).toContainText("Browser Extension Test Page");
+    await expect(testPage.locator("#download-btn")).toBeVisible();
+    await expect(testPage.locator("#username")).toBeVisible();
   });
 
   test("should test background script messaging directly", async ({ context, extensionId }) => {
@@ -111,41 +78,36 @@ test.describe("Debug Messaging", () => {
     }
   });
 
-  test("should wait for content script injection properly", async ({ context }) => {
-    const testPage = await context.newPage();
+  test("should verify background script handles function execution message format", async ({
+    context,
+    extensionId,
+  }) => {
+    const sidepanelPage = await context.newPage();
+    await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
-    // Create a page that might load content scripts
-    await testPage.goto("data:text/html,<html><body><h1>Test</h1></body></html>");
+    // Test that background script recognizes EXECUTE_FUNCTION messages
+    const functionTest = await sidepanelPage.evaluate(async () => {
+      return new Promise((resolve) => {
+        (globalThis as any).chrome.runtime.sendMessage(
+          {
+            type: "EXECUTE_FUNCTION",
+            payload: {
+              function: "summary",
+              arguments: {},
+            },
+          },
+          (response: any) => {
+            resolve(response);
+          },
+        );
 
-    // Wait and check multiple times
-    let attempts = 0;
-    let helperFound = false;
-
-    while (attempts < 10 && !helperFound) {
-      await testPage.waitForTimeout(500);
-
-      helperFound = await testPage.evaluate(() => {
-        return typeof (window as any).LLMHelper !== "undefined";
+        // Timeout fallback
+        setTimeout(() => resolve({ success: false, error: "timeout" }), 3000);
       });
-
-      attempts++;
-      console.log(`Attempt ${attempts}: LLMHelper found = ${helperFound}`);
-    }
-
-    // Also check for content script console log
-    const logs: string[] = [];
-    testPage.on("console", (msg) => {
-      logs.push(msg.text());
     });
 
-    await testPage.waitForTimeout(1000);
-    console.log("Console logs:", logs);
-
-    // At minimum, check if the page loaded properly
-    const pageReady = await testPage.evaluate(() => {
-      return document.readyState === "complete";
-    });
-
-    expect(pageReady).toBe(true);
+    // Background script should handle the message format (even if content script fails)
+    expect(functionTest).toHaveProperty("type");
+    expect((functionTest as any).type).toMatch(/FUNCTION_RESPONSE|ERROR/);
   });
 });

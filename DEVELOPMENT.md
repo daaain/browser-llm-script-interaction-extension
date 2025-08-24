@@ -71,43 +71,16 @@ pnpm dev:firefox   # Firefox with hot reload
 
 ## Project Architecture
 
-### Directory Structure
-
-```
-├── entrypoints/           # WXT entrypoints
-│   ├── background.ts      # Service worker (handles LLM communication)
-│   ├── popup/             # Main chat interface
-│   │   ├── index.html     # Popup HTML
-│   │   ├── index.ts       # Popup logic
-│   │   └── index.css      # Popup styling
-│   └── options/           # Settings/configuration page
-│       ├── index.html     # Options HTML
-│       ├── index.ts       # Options logic
-│       └── index.css      # Options styling
-├── utils/                 # Shared utilities (auto-imported by WXT)
-│   ├── types.ts          # TypeScript type definitions
-│   └── llm-service.ts    # LLM API integration service
-├── public/               # Static assets
-│   └── icons/            # Extension icons (16, 48, 128px)
-├── tests/                # Test files
-│   ├── unit/            # Unit tests (Vitest)
-│   └── e2e/             # End-to-end tests (Playwright)
-├── .output/             # Built extension files
-│   ├── chrome-mv3/      # Chrome build output
-│   └── firefox-mv2/     # Firefox build output
-└── wxt.config.ts        # WXT configuration
-```
-
 ### Key Components
 
 #### Background Script (`entrypoints/background.ts`)
 
 - Service worker for Chrome MV3, background script for Firefox MV2
-- Handles message passing between popup/options and LLM APIs
+- Handles message passing between sidepanel/options and LLM APIs
 - Manages extension settings storage
 - Contains LLM service integration
 
-#### Popup Interface (`entrypoints/popup/`)
+#### Sidepanel Interface (`entrypoints/sidepanel/`)
 
 - Main chat interface accessed via extension icon
 - Displays chat history and handles user input
@@ -158,6 +131,14 @@ pnpm test:e2e --project=chrome
 pnpm test:e2e tests/e2e/manual-streaming-test.spec.ts
 ```
 
+The comprehensive test suite includes:
+
+- **Multi-round tool calling validation** - Verifies multiple API calls with tool usage
+- **Real LLM integration testing** - Tests actual tool execution with screenshot, click, and type tools
+- **UI state management** - Validates streaming indicators, message rendering, and form interactions
+- **Cross-browser compatibility** - Chrome MV3 and Firefox MV2 support
+- **Settings persistence** - Configuration save/load across page reloads
+
 ### Linting and Formatting
 
 ```bash
@@ -202,10 +183,11 @@ Generated automatically by WXT based on entrypoints and config:
 
 ### Supported Providers
 
-1. **LM Studio** (local models)
+1. **LM Studio** (local models) - **Default**
    - Endpoint: `http://localhost:1234/v1/chat/completions`
    - No API key required
    - Best for development and privacy
+   - **Recommended**: Use tool-capable models like Qwen3-Coder-30B for full functionality
 
 2. **OpenAI API**
    - Endpoint: `https://api.openai.com/v1/chat/completions`
@@ -217,19 +199,40 @@ Generated automatically by WXT based on entrypoints and config:
    - Configurable endpoint and model
    - Optional API key support
 
+### Tool Integration
+
+**Tools are enabled by default** and include:
+
+- `screenshot` - Capture current page
+- `click` - Click on page elements
+- `type` - Enter text in form fields
+- `find` - Locate elements on the page
+
+Tools use content script injection for cross-page functionality.
+
 ### Message Format
 
-Uses OpenAI chat completions format:
+Uses OpenAI chat completions format with tool support:
 
 ```typescript
 {
   model: string;
   messages: Array<{
-    role: 'user' | 'assistant' | 'system';
-    content: string;
+    role: 'user' | 'assistant' | 'system' | 'tool';
+    content: string | MessageContent;
+    tool_calls?: LLMToolCall[];
+    tool_call_id?: string;
+  }>;
+  tools?: Array<{
+    type: 'function';
+    function: {
+      name: string;
+      description: string;
+      parameters: JSONSchema;
+    };
   }>;
   max_tokens?: number;
-  temperature?: number;
+  temperature?: number; // Default: 0.1 for consistency
 }
 ```
 
@@ -257,7 +260,7 @@ Uses OpenAI chat completions format:
 
 ### Browser DevTools
 
-- **Chrome**: Right-click extension → "Inspect popup"
+- **Chrome**: Right-click extension → "Inspect sidepanel"
 - **Firefox**: about:debugging → Extension → "Inspect"
 - **Background Script**: chrome://extensions/ → Extension details → "Inspect views: service worker"
 
@@ -267,11 +270,16 @@ Uses OpenAI chat completions format:
 2. **Extension Won't Load**: Check manifest.json syntax and permissions
 3. **API Connection Failed**: Verify LM Studio server is running
 4. **TypeScript Errors**: Run `pnpm typecheck` for detailed errors
+5. **E2E Test Failures**:
+   - Ensure LM Studio is running with a tool-capable model (e.g., Qwen3-Coder-30B)
+   - Check that tools are enabled by default in settings
+   - Verify temperature is set to 0.1 for consistent results
+   - Tests expect multiple tool calls for comprehensive validation
 
 ### Logging
 
 - Background script logs appear in service worker console
-- Popup logs appear in popup DevTools console
+- Sidepanel logs appear in sidepanel DevTools console
 - Use `console.log()` for debugging (remove in production)
 
 ## Contributing
@@ -288,8 +296,16 @@ Uses OpenAI chat completions format:
 1. Fork and create feature branch
 2. Add tests for new functionality
 3. Ensure all tests pass: `pnpm test && pnpm test:e2e`
-4. Update documentation if needed
-5. Submit pull request with clear description
+4. Run linting and type checking: `pnpm lint && pnpm typecheck`
+5. Update documentation if needed
+6. Submit pull request with clear description
+
+**Testing Requirements**:
+
+- Unit tests for new utilities and services
+- E2E tests for UI changes and tool functionality
+- Multi-round tool calling validation for complex features
+- Cross-browser compatibility verification
 
 ### Release Process
 
@@ -301,7 +317,7 @@ Uses OpenAI chat completions format:
 ## Performance Considerations
 
 - Keep background script lightweight (affects startup time)
-- Minimize popup bundle size for fast loading
+- Minimize sidepanel bundle size for fast loading
 - Use efficient storage patterns for chat history
 - Consider rate limiting for API requests
 

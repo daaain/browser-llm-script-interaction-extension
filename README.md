@@ -5,7 +5,7 @@ A cross-browser extension that provides a simple chat interface for interacting 
 ## Features
 
 - 🌐 Cross-browser support (Chrome & Firefox)  
-- 💬 Simple chat interface via popup
+- 💬 Simple chat interface via sidepanel
 - ⚙️ Configurable LLM providers (OpenAI, LM Studio, Custom)
 - 💾 Persistent chat history
 - 🔒 Secure API key storage
@@ -13,6 +13,8 @@ A cross-browser extension that provides a simple chat interface for interacting 
 ## Quick Start
 
 Ready-to-use extension builds are available in the releases section. For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+If you want to see a quick demo, go to Google.com and type `click reject all and search for "fluffy robots"`
 
 ## Installation
 
@@ -32,7 +34,7 @@ Ready-to-use extension builds are available in the releases section. For develop
    - The extension should now appear in your extensions list
 
 3. **Access the extension**:
-   - Click the extension icon in the toolbar to open the popup
+   - Click the extension icon in the toolbar to open the sidepanel
    - Or right-click the extension icon → Options to configure
 
 ### Firefox Installation
@@ -51,7 +53,7 @@ Ready-to-use extension builds are available in the releases section. For develop
    - The extension should now appear in your add-ons list
 
 3. **Access the extension**:
-   - Click the extension icon in the toolbar to open the popup
+   - Click the extension icon in the toolbar to open the sidepanel
    - Or go to Add-ons Manager → Extensions to configure
 
 ## Configuration
@@ -59,7 +61,7 @@ Ready-to-use extension builds are available in the releases section. For develop
 ### Initial Setup
 
 1. **Open Settings**:
-   - Click the gear icon (⚙️) in the extension popup
+   - Click the gear icon (⚙️) in the extension sidepanel
    - Or right-click the extension icon → Options
 
 2. **Configure LM Studio** (recommended for local models):
@@ -77,7 +79,7 @@ Ready-to-use extension builds are available in the releases section. For develop
    - Start the local server (should show green indicator)
 
 4. **Start Chatting**:
-   - Open the extension popup
+   - Open the extension sidepanel
    - Type your message and press Enter
    - The extension will communicate with your local LLM
 

@@ -40,10 +40,17 @@ async function executeContentScriptFunction(
     
     return response;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`Error executing content script function ${functionName}:`, error);
+    
+    // Provide more specific error information for debugging
+    if (errorMessage.includes('not found')) {
+      console.warn(`Tool '${functionName}' is not implemented in the content script. Check if it needs to be added to the llm-helper.ts interface and content script switch statement.`);
+    }
+    
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: errorMessage
     };
   }
 }
@@ -297,83 +304,7 @@ export const typeTool = tool({
   }
 });
 
-/**
- * Scroll Tool
- * Scroll the page or specific elements
- */
-export const scrollTool = tool({
-  description: 'Scroll the page or a specific element. Useful for revealing more content or navigating to specific sections.',
-  inputSchema: z.object({
-    direction: z.enum(['up', 'down', 'left', 'right', 'top', 'bottom'])
-      .describe('Direction to scroll'),
-    distance: z.number()
-      .optional()
-      .describe('Distance to scroll in pixels (for up/down/left/right)'),
-    selector: z.string()
-      .optional()
-      .describe('CSS selector of element to scroll (if not provided, scrolls the page)'),
-    smooth: z.boolean()
-      .optional()
-      .default(true)
-      .describe('Whether to use smooth scrolling animation')
-  }),
-  execute: async ({ direction, distance, selector, smooth = true }) => {
-    const result = await executeContentScriptFunction('scroll', { 
-      direction,
-      distance,
-      selector,
-      smooth
-    });
-    
-    return result.success ? result.result : { error: result.error };
-  }
-});
 
-/**
- * Wait Tool
- * Wait for a specified amount of time or for an element to appear
- */
-export const waitTool = tool({
-  description: 'Wait for a specified time or for an element to appear on the page. Useful when pages need time to load content.',
-  inputSchema: z.object({
-    type: z.enum(['time', 'element'])
-      .describe('Type of wait: time (wait for duration) or element (wait for element to appear)'),
-    duration: z.number()
-      .optional()
-      .describe('Duration in milliseconds (for time wait)'),
-    selector: z.string()
-      .optional()
-      .describe('CSS selector of element to wait for (for element wait)'),
-    timeout: z.number()
-      .optional()
-      .default(10000)
-      .describe('Maximum time to wait in milliseconds')
-  }),
-  execute: async ({ type, duration, selector, timeout = 10000 }) => {
-    if (type === 'time' && !duration) {
-      return {
-        success: false,
-        error: 'Duration is required for time wait'
-      };
-    }
-    
-    if (type === 'element' && !selector) {
-      return {
-        success: false,
-        error: 'Selector is required for element wait'
-      };
-    }
-
-    const result = await executeContentScriptFunction('wait', { 
-      type,
-      duration,
-      selector,
-      timeout
-    });
-    
-    return result.success ? result.result : { error: result.error };
-  }
-});
 
 /**
  * Collection of all available tools
@@ -386,8 +317,6 @@ export const availableTools = {
   summary: summarizeTool,
   click: clickTool,
   type: typeTool,
-  scroll: scrollTool,
-  wait: waitTool,
 };
 
 /**
@@ -398,13 +327,11 @@ export function getConfiguredTools(config: {
   enableScreenshot?: boolean;
   enablePageInteraction?: boolean;
   enableTextExtraction?: boolean;
-  enableNavigation?: boolean;
 } = {}): Record<string, any> {
   const {
     enableScreenshot = true,
     enablePageInteraction = true,
     enableTextExtraction = true,
-    enableNavigation = true,
   } = config;
 
   const tools: Record<string, any> = {};
@@ -424,10 +351,6 @@ export function getConfiguredTools(config: {
     tools.type = typeTool;
   }
 
-  if (enableNavigation) {
-    tools.scroll = scrollTool;
-    tools.wait = waitTool;
-  }
 
   return tools;
 }
@@ -442,6 +365,4 @@ export const toolDescriptions = {
   summary: 'Get page summary and overview',
   click: 'Click on page elements',
   type: 'Type text into input fields',
-  scroll: 'Scroll page or elements',
-  wait: 'Wait for time or elements to appear',
 };

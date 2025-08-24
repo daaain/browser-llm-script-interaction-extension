@@ -44,7 +44,7 @@ export class DebugLogger {
   private async getLogs(): Promise<LogEntry[]> {
     try {
       const result = await browser.storage.local.get([this.logKey]);
-      return result[this.logKey] || [];
+      return (result[this.logKey] as LogEntry[]) || [];
     } catch (error) {
       console.error('Failed to get debug logs:', error);
       return [];

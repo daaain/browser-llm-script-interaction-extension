@@ -206,20 +206,6 @@ export class ChatManager {
     }
   }
 
-  /**
-   * Test the connection
-   */
-  async testConnection(): Promise<{ success: boolean; error?: string }> {
-    try {
-      await this.ensureLLMService();
-      return await this.llmService!.testConnection();
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Connection test failed'
-      };
-    }
-  }
 
   /**
    * Refresh the LLM service (force recreation)

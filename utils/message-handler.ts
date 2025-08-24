@@ -2,12 +2,11 @@ import browser from "webextension-polyfill";
 import type { 
   MessageFromSidebar, 
   MessageToSidebar,
-  ExtensionSettings,
-  MigrationConfig
+  ExtensionSettings
 } from "~/utils/types";
-import { DEFAULT_MIGRATION_CONFIG } from "~/utils/types";
 import { settingsManager } from "~/utils/settings-manager";
 import { chatManager } from "~/utils/chat-manager";
+import { createLLMService } from "~/utils/llm-service";
 import { backgroundLogger } from "~/utils/debug-logger";
 
 /**
@@ -59,6 +58,13 @@ export class MessageHandler {
         case "CAPTURE_SCREENSHOT":
           await this.handleCaptureScreenshot(sendResponse);
           break;
+        case "TEST_CONNECTION":
+          await this.handleTestConnection(sendResponse);
+          break;
+
+        case "EXECUTE_FUNCTION":
+          await this.handleExecuteFunction((msg as any).payload, sendResponse);
+          break;
 
         default:
           console.error("Unknown message type:", (msg as any).type);
@@ -73,11 +79,6 @@ export class MessageHandler {
   private async handleGetSettings(sendResponse: (response: MessageToSidebar) => void): Promise<void> {
     console.log("Processing GET_SETTINGS request");
     const settings = await settingsManager.getSettings();
-    
-    // Ensure migration config is set
-    if (!settings.migrationConfig) {
-      settings.migrationConfig = DEFAULT_MIGRATION_CONFIG;
-    }
     
     const response: MessageToSidebar = {
       type: "SETTINGS_RESPONSE",
@@ -111,10 +112,6 @@ export class MessageHandler {
     console.log("💬 AISDKMessageHandler.handleSendMessage called with:", { message, tabId });
     
     try {
-      // Get migration config
-      const settings = await settingsManager.getSettings();
-      const migrationConfig: MigrationConfig = settings.migrationConfig || DEFAULT_MIGRATION_CONFIG;
-      
       let responseContent: string;
       
       console.log("🤖 Using chat manager");
@@ -194,13 +191,73 @@ export class MessageHandler {
     sendResponse(response);
   }
 
+  private async handleTestConnection(sendResponse: (response: MessageToSidebar) => void): Promise<void> {
+    try {
+      backgroundLogger.info("Processing TEST_CONNECTION request");
+      
+      // Get the current settings to create LLM service
+      const settings = await settingsManager.getSettings();
+      const llmService = createLLMService(settings.provider);
+      const result = await llmService.testConnection();
+      
+      const response: MessageToSidebar = {
+        type: "TEST_CONNECTION_RESPONSE",
+        payload: result,
+      };
+      backgroundLogger.info("Sending test connection response", { result });
+      sendResponse(response);
+    } catch (error) {
+      backgroundLogger.error("Test connection error", { error });
+      this.sendErrorResponse(sendResponse, error instanceof Error ? error.message : "Connection test failed");
+    }
+  }
+
+  private async handleExecuteFunction(
+    payload: { function: string; arguments: any },
+    sendResponse: (response: MessageToSidebar) => void
+  ): Promise<void> {
+    try {
+      backgroundLogger.info("Processing EXECUTE_FUNCTION request", { 
+        function: payload.function, 
+        args: payload.arguments 
+      });
+
+      // Get current active tab
+      const tabs = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+      const activeTab = tabs[0];
+      
+      if (!activeTab?.id) {
+        this.sendErrorResponse(sendResponse, "No active tab found");
+        return;
+      }
+
+      // Send function execution request to content script in active tab
+      const functionMessage = {
+        type: "EXECUTE_FUNCTION",
+        function: payload.function,
+        arguments: payload.arguments,
+      };
+
+      const result = await browser.tabs.sendMessage(activeTab.id, functionMessage);
+      
+      const response: MessageToSidebar = {
+        type: "FUNCTION_RESPONSE",
+        payload: result,
+      };
+      backgroundLogger.info("Function executed successfully", { result });
+      sendResponse(response);
+    } catch (error) {
+      backgroundLogger.error("Function execution error", { error });
+      this.sendErrorResponse(sendResponse, error instanceof Error ? error.message : "Function execution failed");
+    }
+  }
+
   /**
    * Get service info for both implementations
    */
   async getServiceInfo() {
     try {
       const settings = await settingsManager.getSettings();
-      const migrationConfig: MigrationConfig = settings.migrationConfig || DEFAULT_MIGRATION_CONFIG;
       
       const serviceInfo = chatManager.getServiceInfo();
       return {

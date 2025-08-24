@@ -177,30 +177,47 @@ class SettingsManager {
     }
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
+      // First save the current settings so the background script can test with them
+      const updatedSettings: ExtensionSettings = {
+        ...this.currentSettings!,
+        provider: {
+          name: (document.getElementById("provider-select") as HTMLInputElement).value || "Custom",
+          endpoint,
+          model,
+          apiKey: apiKey || undefined,
+        },
       };
 
-      if (apiKey) {
-        headers.Authorization = `Bearer ${apiKey}`;
-      }
+      // Save settings first
+      const saveMessage: MessageFromSidebar = {
+        type: "SAVE_SETTINGS",
+        payload: updatedSettings,
+      };
+      await browser.runtime.sendMessage(saveMessage);
+      this.currentSettings = updatedSettings;
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: "Hello" }],
-          max_tokens: 10,
-          stream: false,
-        }),
-        mode: "cors",
-      });
+      // Now test the connection using the background script
+      const testMessage: MessageFromSidebar = {
+        type: "TEST_CONNECTION",
+        payload: {},
+      };
+      
+      const response = await browser.runtime.sendMessage(testMessage) as MessageToSidebar;
 
-      if (response.ok) {
-        this.showMessage("Connection test successful!", "success");
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (response.type === "TEST_CONNECTION_RESPONSE") {
+        if (response.payload.success) {
+          this.showMessage("Connection test successful!", "success");
+        } else {
+          this.showMessage(
+            `Connection test failed: ${response.payload.error || "Unknown error"}`,
+            "error",
+          );
+        }
+      } else if (response.type === "ERROR") {
+        this.showMessage(
+          `Connection test failed: ${response.payload.error || "Unknown error"}`,
+          "error",
+        );
       }
     } catch (error) {
       console.error("Connection test failed:", error);
@@ -210,6 +227,7 @@ class SettingsManager {
       );
     }
   }
+
 
   private async clearHistory() {
     if (!this.currentSettings) return;

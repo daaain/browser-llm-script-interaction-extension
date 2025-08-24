@@ -58,9 +58,10 @@ export default defineContentScript({
             sendResponse(response);
             return true;
           } else {
+            const availableFunctions = Object.keys(LLMHelper).join(', ');
             const response = { 
               success: false, 
-              error: `Function ${functionName} not found` 
+              error: `Function '${functionName}' not found. Available functions: ${availableFunctions}` 
             };
             sendResponse(response);
             return true;
