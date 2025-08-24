@@ -13,3 +13,4 @@ Roadmap / TODO:
 - handle text selection - add to context with little popup? that could also trigger opening the sidebar?
 - maybe also right click context menu element selection for interaction?
 - wait for active requests to finish before returning tool call results? See <https://github.com/kjleitz/active-requests>
+- truncate tool responses globally

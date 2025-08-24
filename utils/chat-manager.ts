@@ -87,10 +87,23 @@ export class ChatManager {
       let finalContent = '';
 
       // Setup streaming callbacks
-      const onChunk = async (text: string) => {
-        backgroundLogger.debug('🎯 Streaming chunk', { text: text.substring(0, 100) + (text.length > 100 ? '...' : '') });
+      const onChunk = async (textOrUIMessage: string | { role: string; parts: any[]; text?: string }) => {
+        if (typeof textOrUIMessage === 'string') {
+          // Handle text streaming
+          backgroundLogger.debug('🎯 Streaming text chunk', { text: textOrUIMessage.substring(0, 100) + (textOrUIMessage.length > 100 ? '...' : '') });
+          
+          streamingMessage.content = textOrUIMessage;
+        } else {
+          // Handle UI message with parts (tool streaming)
+          backgroundLogger.debug('🎯 Streaming UI message', { 
+            partsCount: textOrUIMessage.parts?.length || 0,
+            text: textOrUIMessage.text?.substring(0, 100) + (textOrUIMessage.text && textOrUIMessage.text.length > 100 ? '...' : '') 
+          });
+          
+          (streamingMessage as any).parts = textOrUIMessage.parts;
+          streamingMessage.content = textOrUIMessage.text || '';
+        }
         
-        streamingMessage.content = text;
         currentConversation = [...messagesForAPI, streamingMessage];
         
         // Update storage with streaming content

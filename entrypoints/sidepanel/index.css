@@ -396,8 +396,8 @@ body {
   background-color: #e3f2fd;
   border: 1px solid #bbdefb;
   border-radius: 8px;
-  padding: 10px 12px;
-  margin: 8px 0 4px 0;
+  padding: 5px 6px;
+  margin: 4px 0;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 0.85em;
   color: #1976d2;
@@ -414,8 +414,8 @@ body {
   background-color: #f1f8e9;
   border: 1px solid #c8e6c9;
   border-radius: 8px;
-  padding: 10px 12px;
-  margin: 4px 0 8px 0;
+  padding: 5px 6px;
+  margin: 4px 0;
   color: #2e7d32;
   width: 100%;
   box-sizing: border-box;
@@ -443,13 +443,13 @@ body {
 
 .tool-result pre {
   background-color: rgba(0, 0, 0, 0.03);
-  padding: 10px;
+  padding: 4px;
   border-radius: 4px;
   overflow-x: auto;
-  margin: 6px 0 0 0;
+  margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 250px;
+  max-height: 150px;
   overflow-y: auto;
   width: 100%;
   box-sizing: border-box;

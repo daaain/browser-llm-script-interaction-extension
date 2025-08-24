@@ -128,7 +128,7 @@ export class LLMService {
    */
   async streamMessage(
     messages: any[],
-    onChunk: (text: string) => void,
+    onChunk: (textOrUIMessage: string | { role: string; parts: any[]; text?: string }) => void,
     onComplete: (fullText: string, toolCalls?: any[], toolResults?: any[], uiMessage?: any) => void,
     onError: (error: string) => void,
     enableTools: boolean = false
@@ -229,13 +229,14 @@ export class LLMService {
         messages: modelMessages,
         tools: availableTools,
         temperature: 0.1,
-        stopWhen: stepCountIs(10)
+        stopWhen: stepCountIs(50)
       });
 
       backgroundLogger.info('AI SDK streaming started');
       
       // Build UI message parts as we stream
       const messageParts: any[] = [];
+      let lastTextIndex = 0;
       
       // Stream the full stream with all event types
       for await (const part of result.fullStream) {
@@ -249,6 +250,16 @@ export class LLMService {
             
           case 'tool-call':
             backgroundLogger.debug('Tool call received', { toolName: part.toolName, input: part.input });
+            
+            // Add any new text that came before this tool call
+            const textBeforeTool = finalText.substring(lastTextIndex);
+            if (textBeforeTool.trim()) {
+              messageParts.push({
+                type: 'text',
+                text: textBeforeTool
+              });
+            }
+            
             // Add tool call part
             const toolCallPart = {
               type: `tool-${part.toolName}`,
@@ -258,16 +269,66 @@ export class LLMService {
               state: 'input-available'
             };
             messageParts.push(toolCallPart);
+            
+            // Update text tracking position
+            lastTextIndex = finalText.length;
+            
+            // Send real-time update with proper chronological ordering
+            const toolCallUIMessage = {
+              role: 'assistant',
+              parts: [...messageParts],
+              text: finalText
+            };
+            onChunk(toolCallUIMessage);
             break;
             
           case 'tool-result':
-            backgroundLogger.debug('Tool result received', { toolCallId: part.toolCallId, output: part.output });
-            // Update the tool part with result
+            backgroundLogger.debug('Tool result received', { toolCallId: part.toolCallId, output: part.output, isError: (part as any).isError });
+            
+            // Update the tool part with result or error
             const toolResultIndex = messageParts.findIndex(p => p.toolCallId === part.toolCallId);
             if (toolResultIndex >= 0) {
-              messageParts[toolResultIndex].state = 'output-available';
-              messageParts[toolResultIndex].output = part.output;
+              // Check if this is an error result (AI SDK isError flag or error object pattern)
+              const isError = (part as any).isError || (
+                part.output && 
+                typeof part.output === 'object' && 
+                'error' in part.output && 
+                !('success' in part.output && part.output.success === true)
+              );
+              
+              if (isError) {
+                messageParts[toolResultIndex].state = 'output-error';
+                // Extract error message from various formats
+                let errorText = 'Tool execution failed';
+                if (typeof part.output === 'string') {
+                  errorText = part.output;
+                } else if (part.output && typeof part.output === 'object' && 'error' in part.output) {
+                  errorText = part.output.error;
+                }
+                messageParts[toolResultIndex].errorText = errorText;
+              } else {
+                messageParts[toolResultIndex].state = 'output-available';
+                messageParts[toolResultIndex].output = part.output;
+              }
             }
+            
+            // Add any new text that came after the tool call
+            const textAfterTool = finalText.substring(lastTextIndex);
+            if (textAfterTool.trim()) {
+              messageParts.push({
+                type: 'text',
+                text: textAfterTool
+              });
+              lastTextIndex = finalText.length;
+            }
+            
+            // Send real-time update with tool result
+            const toolResultUIMessage = {
+              role: 'assistant',
+              parts: [...messageParts],
+              text: finalText
+            };
+            onChunk(toolResultUIMessage);
             break;
             
           case 'error':
@@ -277,11 +338,12 @@ export class LLMService {
         }
       }
       
-      // Add text content to parts if we have any
-      if (finalText.trim()) {
-        messageParts.unshift({
+      // Add any remaining text after all tool calls
+      const remainingText = finalText.substring(lastTextIndex);
+      if (remainingText.trim()) {
+        messageParts.push({
           type: 'text',
-          text: finalText
+          text: remainingText
         });
       }
       
@@ -329,7 +391,7 @@ export class LLMService {
 
       this.streamMessage(
         testMessages,
-        (_chunk: string) => {
+        (_textOrUIMessage: string | { role: string; parts: any[]; text?: string }) => {
           // If we receive any chunk, the connection is working
         },
         (fullText: string) => {

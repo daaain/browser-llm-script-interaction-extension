@@ -1,5 +1,5 @@
 import { tool } from 'ai';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import browser from 'webextension-polyfill';
 import type { ContentScriptFunctionRequest, ContentScriptFunctionResponse } from './types';
 
@@ -10,6 +10,54 @@ import type { ContentScriptFunctionRequest, ContentScriptFunctionResponse } from
  * through browser automation. Each tool is defined using the AI SDK's tool()
  * function with Zod schemas for type safety and automatic validation.
  */
+
+/**
+ * Convert string boolean values to actual booleans recursively
+ */
+function convertStringBooleans(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (typeof obj === 'string') {
+    // Convert string "true"/"false" to boolean, case-insensitive
+    const lowerStr = obj.toLowerCase();
+    if (lowerStr === 'true') return true;
+    if (lowerStr === 'false') return false;
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(convertStringBooleans);
+  }
+  
+  if (typeof obj === 'object') {
+    const converted: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      converted[key] = convertStringBooleans(value);
+    }
+    return converted;
+  }
+  
+  return obj;
+}
+
+/**
+ * Zod preprocessor for converting string booleans to actual booleans
+ */
+const booleanPreprocessor = (val: any) => {
+  if (typeof val === 'string') {
+    const lowerStr = val.toLowerCase();
+    if (lowerStr === 'true') return true;
+    if (lowerStr === 'false') return false;
+  }
+  return val;
+};
+
+/**
+ * Helper to create a boolean schema with string boolean preprocessing
+ */
+const booleanWithStringConversion = () => z.preprocess(booleanPreprocessor, z.boolean());
 
 /**
  * Execute a function in the content script context
@@ -26,10 +74,13 @@ async function executeContentScriptFunction(
       throw new Error('No active tab found');
     }
 
+    // Convert string booleans to actual booleans to handle LLM parameter issues
+    const convertedArgs = convertStringBooleans(args);
+
     const message: ContentScriptFunctionRequest = {
       type: 'EXECUTE_FUNCTION',
       function: functionName,
-      arguments: args
+      arguments: convertedArgs
     };
 
     const response = await browser.tabs.sendMessage(activeTab.id, message) as ContentScriptFunctionResponse;
@@ -62,7 +113,7 @@ async function executeContentScriptFunction(
 export const screenshotTool = tool({
   description: 'Capture a screenshot of the current page. Use this to see what the user is looking at or to analyze visual content.',
   inputSchema: z.object({
-    fullPage: z.boolean()
+    fullPage: booleanWithStringConversion()
       .optional()
       .default(false)
       .describe('Whether to capture the full page (true) or just the visible viewport (false)'),
@@ -113,7 +164,7 @@ export const findElementsTool = tool({
         .optional()
         .default(10)
         .describe('Maximum number of elements to return'),
-      includeHidden: z.boolean()
+      includeHidden: booleanWithStringConversion()
         .optional()
         .default(false)
         .describe('Whether to include hidden elements'),
@@ -148,11 +199,11 @@ export const extractTextTool = tool({
       .optional()
       .describe('CSS selector to extract text from specific elements. If not provided, extracts all page text.'),
     options: z.object({
-      includeLinks: z.boolean()
+      includeLinks: booleanWithStringConversion()
         .optional()
         .default(true)
         .describe('Whether to include link text'),
-      includeButtons: z.boolean()
+      includeButtons: booleanWithStringConversion()
         .optional()
         .default(true)
         .describe('Whether to include button text'),
@@ -188,15 +239,15 @@ export const extractTextTool = tool({
 export const summarizeTool = tool({
   description: 'Get a comprehensive summary of the current page including title, URL, main headings, key content, and important interactive elements.',
   inputSchema: z.object({
-    includeMetadata: z.boolean()
+    includeMetadata: booleanWithStringConversion()
       .optional()
       .default(true)
       .describe('Whether to include page metadata (title, URL, description)'),
-    includeHeadings: z.boolean()
+    includeHeadings: booleanWithStringConversion()
       .optional()
       .default(true)
       .describe('Whether to include page headings structure'),
-    includeInteractiveElements: z.boolean()
+    includeInteractiveElements: booleanWithStringConversion()
       .optional()
       .default(true)
       .describe('Whether to include buttons, forms, and links'),
@@ -235,7 +286,7 @@ export const clickTool = tool({
         .optional()
         .default(1000)
         .describe('Milliseconds to wait after clicking'),
-      scrollIntoView: z.boolean()
+      scrollIntoView: booleanWithStringConversion()
         .optional()
         .default(true)
         .describe('Whether to scroll element into view before clicking')
@@ -275,7 +326,7 @@ export const typeTool = tool({
     text: z.string()
       .describe('Text to type into the element'),
     options: z.object({
-      clear: z.boolean()
+      clear: booleanWithStringConversion()
         .optional()
         .default(true)
         .describe('Whether to clear existing content before typing'),
@@ -283,7 +334,7 @@ export const typeTool = tool({
         .optional()
         .default(100)
         .describe('Delay between keystrokes in milliseconds'),
-      pressEnter: z.boolean()
+      pressEnter: booleanWithStringConversion()
         .optional()
         .default(false)
         .describe('Whether to press Enter after typing')

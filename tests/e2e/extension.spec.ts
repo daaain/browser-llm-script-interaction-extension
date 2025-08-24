@@ -213,7 +213,8 @@ test.describe("Service Worker", () => {
     // Service worker should respond or timeout gracefully
     // The result can be "no-response", "timeout", undefined, or an actual response
     expect(
-      ["no-response", "timeout", undefined].includes(result) || typeof result === "object",
+      ["no-response", "timeout", undefined].includes(result as string | undefined) ||
+        typeof result === "object",
     ).toBeTruthy();
   });
 });

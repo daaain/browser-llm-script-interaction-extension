@@ -8,6 +8,7 @@ import type {
   MessageContent,
 } from '~/utils/types';
 import { sidepanelLogger } from '~/utils/debug-logger';
+import { MemoizedMarkdown } from './MemoizedMarkdown';
 
 /**
  * React-based Chat Interface with AI SDK Integration
@@ -260,131 +261,157 @@ const ChatInterface: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const formatMessageContent = (content: MessageContent): string => {
-    if (!content) return '';
+  const MessageContentComponent: React.FC<{ content: MessageContent }> = ({ content }) => {
+    if (!content) return null;
     
     if (typeof content === 'string') {
-      return formatTextContent(content);
+      return <MemoizedMarkdown content={content} id={`content-${Math.random().toString(36).substring(2, 11)}`} />;
     }
     
-    return content.map((item: any) => {
-      if (item.type === 'text' && item.text) {
-        return formatTextContent(item.text);
-      } else if (item.type === 'input_image' && item.image_url) {
-        return `<div class="screenshot-container">
-          <img src="${item.image_url.url}" class="screenshot-thumbnail" style="cursor: pointer;">
-        </div>`;
+    return (
+      <>
+        {content.map((item: any, index: number) => {
+          if (item.type === 'text' && item.text) {
+            return <MemoizedMarkdown key={index} content={item.text} id={`text-${index}-${Math.random().toString(36).substring(2, 11)}`} />;
+          } else if (item.type === 'input_image' && item.image_url) {
+            return (
+              <div key={index} className="screenshot-container">
+                <img 
+                  src={item.image_url.url} 
+                  className="screenshot-thumbnail" 
+                  style={{ cursor: 'pointer' }}
+                  alt="Screenshot"
+                />
+              </div>
+            );
+          }
+          return null;
+        })}
+      </>
+    );
+  };
+
+
+  const ToolCallDisplay: React.FC<{ toolName: string; part: any }> = ({ toolName, part }) => {
+    const input = part.input || {};
+    const state = part.state || 'input-streaming';
+    
+    const renderToolCall = () => (
+      <div className="tool-call">
+        <strong>🛠️ Calling:</strong><br />
+        {toolName}({JSON.stringify(input, null, 2)})
+      </div>
+    );
+    
+    const renderExecuting = () => (
+      <div className="tool-result executing">
+        <strong>🔧 Tool Result:</strong>
+        <em>Executing...</em>
+      </div>
+    );
+    
+    const renderResult = () => {
+      if (part.output?.type === 'screenshot' && part.output.dataUrl) {
+        return (
+          <div className="tool-result">
+            <strong>🔧 Tool Result:</strong>
+            <div className="screenshot-container">
+              <img src={part.output.dataUrl} className="screenshot-thumbnail" style={{ cursor: 'pointer' }} />
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div className="tool-result">
+            <strong>🔧 Tool Result:</strong>
+            <pre><code>{JSON.stringify(part.output, null, 2)}</code></pre>
+          </div>
+        );
       }
-      return '';
-    }).join('');
+    };
+    
+    const renderError = () => (
+      <div className="tool-result">
+        <strong>🔧 Tool Result:</strong>
+        <pre><code>Error: {part.errorText || 'Unknown error'}</code></pre>
+      </div>
+    );
+    
+    switch (state) {
+      case 'input-streaming':
+      case 'input-available':
+        return (
+          <>
+            {renderToolCall()}
+            {renderExecuting()}
+          </>
+        );
+      case 'output-available':
+        return (
+          <>
+            {renderToolCall()}
+            {part.output !== undefined ? renderResult() : renderExecuting()}
+          </>
+        );
+      case 'output-error':
+        return (
+          <>
+            {renderToolCall()}
+            {renderError()}
+          </>
+        );
+      default:
+        return null;
+    }
   };
-
-  const formatTextContent = (text: string): string => {
-    let formatted = text;
-    formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-    formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    formatted = formatted.replace(/\n/g, '<br>');
-    return formatted;
+  
+  const MessagePart: React.FC<{ part: any; index: number }> = ({ part, index }) => {
+    if (part.type === 'text') {
+      if (part.text && part.text.trim()) {
+        return (
+          <div key={index} className="assistant-text">
+            <MemoizedMarkdown content={part.text} id={`part-${index}-${Math.random().toString(36).substring(2, 11)}`} />
+          </div>
+        );
+      }
+      return null;
+    }
+    
+    if (part.type.startsWith('tool-')) {
+      const toolName = part.type.replace('tool-', '');
+      return <ToolCallDisplay key={index} toolName={toolName} part={part} />;
+    }
+    
+    sidepanelLogger.warn('Unknown part type', { partType: part.type, part });
+    return null;
   };
-
-  const buildAssistantMessageHTML = (message: ChatMessage): string => {
-    sidepanelLogger.debug('buildAssistantMessageHTML called', { messageId: message.id, hasContent: !!message.content });
-    const contentParts: string[] = [];
+  
+  const renderAssistantMessage = (message: ChatMessage) => {
+    sidepanelLogger.debug('renderAssistantMessage called', { messageId: message.id, hasContent: !!message.content });
     
     // Process AI SDK UI parts structure
     if ((message as any).parts && Array.isArray((message as any).parts)) {
       sidepanelLogger.debug('Processing message parts (AI SDK UI)', { partCount: (message as any).parts.length });
       
-      for (const part of (message as any).parts) {
-        switch (part.type) {
-          case 'text':
-            if (part.text && part.text.trim()) {
-              contentParts.push(`<div class="assistant-text">${formatTextContent(part.text)}</div>`);
-            }
-            break;
-            
-          // Handle dynamic tool call types (e.g., 'tool-screenshot', 'tool-find', etc.)
-          default:
-            if (part.type.startsWith('tool-')) {
-              const toolName = part.type.replace('tool-', '');
-              const input = part.input || {};
-              const state = part.state || 'input-streaming';
-              
-              switch (state) {
-                case 'input-streaming':
-                  contentParts.push(`<div class="tool-call">
-                    <strong>🛠️ Calling:</strong><br>${toolName}(${JSON.stringify(input, null, 2)})
-                  </div>`);
-                  contentParts.push(`<div class="tool-result executing">
-                    <strong>🔧 Tool Result:</strong>
-                    <em>Executing...</em>
-                  </div>`);
-                  break;
-                  
-                case 'input-available':
-                  contentParts.push(`<div class="tool-call">
-                    <strong>🛠️ Calling:</strong><br>${toolName}(${JSON.stringify(input, null, 2)})
-                  </div>`);
-                  contentParts.push(`<div class="tool-result executing">
-                    <strong>🔧 Tool Result:</strong>
-                    <em>Executing...</em>
-                  </div>`);
-                  break;
-                  
-                case 'output-available':
-                  contentParts.push(`<div class="tool-call">
-                    <strong>🛠️ Calling:</strong><br>${toolName}(${JSON.stringify(input, null, 2)})
-                  </div>`);
-                  
-                  if (part.output !== undefined) {
-                    if (part.output?.type === 'screenshot' && part.output.dataUrl) {
-                      contentParts.push(`<div class="tool-result">
-                        <strong>🔧 Tool Result:</strong>
-                        <div class="screenshot-container">
-                          <img src="${part.output.dataUrl}" class="screenshot-thumbnail" style="cursor: pointer;">
-                        </div>
-                      </div>`);
-                    } else {
-                      contentParts.push(`<div class="tool-result">
-                        <strong>🔧 Tool Result:</strong>
-                        <pre><code>${JSON.stringify(part.output, null, 2)}</code></pre>
-                      </div>`);
-                    }
-                  } else {
-                    contentParts.push(`<div class="tool-result executing">
-                      <strong>🔧 Tool Result:</strong>
-                      <em>Executing...</em>
-                    </div>`);
-                  }
-                  break;
-                  
-                case 'output-error':
-                  contentParts.push(`<div class="tool-call">
-                    <strong>🛠️ Calling:</strong><br>${toolName}(${JSON.stringify(input, null, 2)})
-                  </div>`);
-                  contentParts.push(`<div class="tool-result">
-                    <strong>🔧 Tool Result:</strong>
-                    <pre><code>Error: ${part.errorText || 'Unknown error'}</code></pre>
-                  </div>`);
-                  break;
-              }
-            } else {
-              sidepanelLogger.warn('Unknown part type', { partType: part.type, part });
-            }
-            break;
-        }
-      }
+      return (
+        <div className="assistant-message">
+          {(message as any).parts.map((part: any, index: number) => (
+            <MessagePart key={index} part={part} index={index} />
+          ))}
+        </div>
+      );
     } else {
       // Fallback to plain text content if no parts
       const textContent = (message as any).currentStreamingText || message.content;
       if (textContent && (typeof textContent === 'string' ? textContent.trim() : textContent.length > 0)) {
-        contentParts.push(`<div class="assistant-text">${formatMessageContent(textContent)}</div>`);
+        return (
+          <div className="assistant-text">
+            <MessageContentComponent content={textContent} />
+          </div>
+        );
       }
+      return null;
     }
-    
-    return contentParts.join('');
   };
 
   return (
@@ -426,9 +453,9 @@ const ChatInterface: React.FC = () => {
                   className={`message ${message.role} ${message.isStreaming ? 'streaming' : ''}`}
                 >
                   {message.role === 'assistant' ? (
-                    <div dangerouslySetInnerHTML={{ __html: buildAssistantMessageHTML(message) }} />
+                    renderAssistantMessage(message)
                   ) : (
-                    <div dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }} />
+                    <MessageContentComponent content={message.content} />
                   )}
                 </div>
               ));
