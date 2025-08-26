@@ -1,21 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LLMService } from "../../utils/llm-service";
-import type { ChatMessage, LLMProvider } from "../../utils/types";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LLMService } from '../../utils/llm-service';
+import type { ChatMessage, LLMProvider } from '../../utils/types';
 
 // Mock the AI SDK
-vi.mock("ai", () => ({
+vi.mock('ai', () => ({
   streamText: vi.fn(),
   convertToModelMessages: vi.fn((messages) => messages),
   stepCountIs: vi.fn(),
 }));
 
 // Mock available tools
-vi.mock("../../utils/ai-tools", () => ({
+vi.mock('../../utils/ai-tools', () => ({
   availableTools: [],
 }));
 
 // Mock background logger
-vi.mock("../../utils/debug-logger", () => ({
+vi.mock('../../utils/debug-logger', () => ({
   backgroundLogger: {
     info: vi.fn(),
     debug: vi.fn(),
@@ -24,16 +24,16 @@ vi.mock("../../utils/debug-logger", () => ({
   },
 }));
 
-describe("LLMService", () => {
+describe('LLMService', () => {
   let llmService: LLMService;
   let mockProvider: LLMProvider;
 
   beforeEach(() => {
     mockProvider = {
-      name: "Test Provider",
-      endpoint: "http://localhost:1234/v1/chat/completions",
-      model: "test-model",
-      apiKey: "test-key",
+      name: 'Test Provider',
+      endpoint: 'http://localhost:1234/v1/chat/completions',
+      model: 'test-model',
+      apiKey: 'test-key',
     };
 
     llmService = new LLMService(mockProvider);
@@ -44,14 +44,14 @@ describe("LLMService", () => {
     vi.resetAllMocks();
   });
 
-  describe("streamMessage", () => {
-    it("should call streamMessage with correct parameters", async () => {
-      const { streamText } = await import("ai");
+  describe('streamMessage', () => {
+    it('should call streamMessage with correct parameters', async () => {
+      const { streamText } = await import('ai');
       const mockMessages: ChatMessage[] = [
         {
-          id: "1",
-          role: "user",
-          content: "Hello",
+          id: '1',
+          role: 'user',
+          content: 'Hello',
           timestamp: Date.now(),
         },
       ];
@@ -63,16 +63,16 @@ describe("LLMService", () => {
       // Mock streamText to simulate successful streaming
       const mockTextStream = {
         async *[Symbol.asyncIterator]() {
-          yield "Hello! ";
-          yield "How can ";
-          yield "I help you?";
+          yield 'Hello! ';
+          yield 'How can ';
+          yield 'I help you?';
         },
       };
 
       const mockResult = {
         textStream: mockTextStream,
-        text: Promise.resolve("Hello! How can I help you?"),
-        finishReason: Promise.resolve("stop"),
+        text: Promise.resolve('Hello! How can I help you?'),
+        finishReason: Promise.resolve('stop'),
         usage: Promise.resolve({ promptTokens: 10, completionTokens: 20 }),
         response: Promise.resolve({}),
       };
@@ -85,11 +85,11 @@ describe("LLMService", () => {
         model: expect.any(Object),
         messages: expect.arrayContaining([
           expect.objectContaining({
-            role: "user",
+            role: 'user',
             parts: expect.arrayContaining([
               expect.objectContaining({
-                type: "text",
-                text: "Hello",
+                type: 'text',
+                text: 'Hello',
               }),
             ]),
           }),
@@ -100,20 +100,20 @@ describe("LLMService", () => {
       // Wait a bit for async iteration to complete
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(mockOnChunk).toHaveBeenCalledWith("Hello! ");
-      expect(mockOnChunk).toHaveBeenCalledWith("Hello! How can ");
-      expect(mockOnChunk).toHaveBeenCalledWith("Hello! How can I help you?");
-      expect(mockOnComplete).toHaveBeenCalledWith("Hello! How can I help you?", [], []);
+      expect(mockOnChunk).toHaveBeenCalledWith('Hello! ');
+      expect(mockOnChunk).toHaveBeenCalledWith('Hello! How can ');
+      expect(mockOnChunk).toHaveBeenCalledWith('Hello! How can I help you?');
+      expect(mockOnComplete).toHaveBeenCalledWith('Hello! How can I help you?', [], []);
       expect(mockOnError).not.toHaveBeenCalled();
     });
 
-    it("should handle streaming errors", async () => {
-      const { streamText } = await import("ai");
+    it('should handle streaming errors', async () => {
+      const { streamText } = await import('ai');
       const mockMessages: ChatMessage[] = [
         {
-          id: "1",
-          role: "user",
-          content: "Hello",
+          id: '1',
+          role: 'user',
+          content: 'Hello',
           timestamp: Date.now(),
         },
       ];
@@ -125,15 +125,15 @@ describe("LLMService", () => {
       // Mock streamText to simulate an error in streaming
       const mockTextStream = {
         async *[Symbol.asyncIterator]() {
-          yield ""; // Add yield to satisfy linter
-          throw new Error("Network error");
+          yield ''; // Add yield to satisfy linter
+          throw new Error('Network error');
         },
       };
 
       const mockResult = {
         textStream: mockTextStream,
-        text: Promise.resolve(""),
-        finishReason: Promise.resolve("stop"),
+        text: Promise.resolve(''),
+        finishReason: Promise.resolve('stop'),
         usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
         response: Promise.resolve({}),
       };
@@ -142,17 +142,17 @@ describe("LLMService", () => {
 
       await llmService.streamMessage(mockMessages, mockOnChunk, mockOnComplete, mockOnError, false);
 
-      expect(mockOnError).toHaveBeenCalledWith("Network error");
+      expect(mockOnError).toHaveBeenCalledWith('Network error');
       expect(mockOnComplete).not.toHaveBeenCalled();
     });
 
-    it("should include tools when enabled", async () => {
-      const { streamText } = await import("ai");
+    it('should include tools when enabled', async () => {
+      const { streamText } = await import('ai');
       const mockMessages: ChatMessage[] = [
         {
-          id: "1",
-          role: "user",
-          content: "Hello",
+          id: '1',
+          role: 'user',
+          content: 'Hello',
           timestamp: Date.now(),
         },
       ];
@@ -164,14 +164,14 @@ describe("LLMService", () => {
       // Mock streamText
       const mockTextStream = {
         async *[Symbol.asyncIterator]() {
-          yield "Hello!";
+          yield 'Hello!';
         },
       };
 
       const mockResult = {
         textStream: mockTextStream,
-        text: Promise.resolve("Hello!"),
-        finishReason: Promise.resolve("stop"),
+        text: Promise.resolve('Hello!'),
+        finishReason: Promise.resolve('stop'),
         usage: Promise.resolve({ promptTokens: 10, completionTokens: 5 }),
         response: Promise.resolve({}),
       };
@@ -195,21 +195,21 @@ describe("LLMService", () => {
     });
   });
 
-  describe("testConnection", () => {
-    it("should return success when streaming works", async () => {
-      const { streamText } = await import("ai");
+  describe('testConnection', () => {
+    it('should return success when streaming works', async () => {
+      const { streamText } = await import('ai');
 
       // Mock successful streaming
       const mockTextStream = {
         async *[Symbol.asyncIterator]() {
-          yield "Connection test response";
+          yield 'Connection test response';
         },
       };
 
       const mockResult = {
         textStream: mockTextStream,
-        text: Promise.resolve("Connection test response"),
-        finishReason: Promise.resolve("stop"),
+        text: Promise.resolve('Connection test response'),
+        finishReason: Promise.resolve('stop'),
         usage: Promise.resolve({ promptTokens: 10, completionTokens: 5 }),
         response: Promise.resolve({}),
       };
@@ -221,21 +221,21 @@ describe("LLMService", () => {
       expect(result).toEqual({ success: true });
     });
 
-    it("should return failure when streaming fails", async () => {
-      const { streamText } = await import("ai");
+    it('should return failure when streaming fails', async () => {
+      const { streamText } = await import('ai');
 
       // Mock streaming failure
       const mockTextStream = {
         async *[Symbol.asyncIterator]() {
-          yield ""; // Add yield to satisfy linter
-          throw new Error("Connection failed");
+          yield ''; // Add yield to satisfy linter
+          throw new Error('Connection failed');
         },
       };
 
       const mockResult = {
         textStream: mockTextStream,
-        text: Promise.resolve(""),
-        finishReason: Promise.resolve("stop"),
+        text: Promise.resolve(''),
+        finishReason: Promise.resolve('stop'),
         usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
         response: Promise.resolve({}),
       };
@@ -246,24 +246,24 @@ describe("LLMService", () => {
 
       expect(result).toEqual({
         success: false,
-        error: "Connection failed",
+        error: 'Connection failed',
       });
     });
 
-    it("should test with correct message format", async () => {
-      const { streamText } = await import("ai");
+    it('should test with correct message format', async () => {
+      const { streamText } = await import('ai');
 
       // Mock successful streaming
       const mockTextStream = {
         async *[Symbol.asyncIterator]() {
-          yield "Hello";
+          yield 'Hello';
         },
       };
 
       const mockResult = {
         textStream: mockTextStream,
-        text: Promise.resolve("Hello"),
-        finishReason: Promise.resolve("stop"),
+        text: Promise.resolve('Hello'),
+        finishReason: Promise.resolve('stop'),
         usage: Promise.resolve({ promptTokens: 10, completionTokens: 5 }),
         response: Promise.resolve({}),
       };
@@ -276,11 +276,11 @@ describe("LLMService", () => {
         model: expect.any(Object),
         messages: expect.arrayContaining([
           expect.objectContaining({
-            role: "user",
+            role: 'user',
             parts: expect.arrayContaining([
               expect.objectContaining({
-                type: "text",
-                text: expect.stringContaining("connection test"),
+                type: 'text',
+                text: expect.stringContaining('connection test'),
               }),
             ]),
           }),
@@ -290,35 +290,35 @@ describe("LLMService", () => {
     });
   });
 
-  describe("updateProvider", () => {
-    it("should update the model when using custom endpoint", () => {
+  describe('updateProvider', () => {
+    it('should update the model when using custom endpoint', () => {
       const newProvider: LLMProvider = {
-        name: "New Provider",
-        endpoint: "http://new-endpoint.com/v1/chat/completions",
-        model: "new-model",
-        apiKey: "new-key",
+        name: 'New Provider',
+        endpoint: 'http://new-endpoint.com/v1/chat/completions',
+        model: 'new-model',
+        apiKey: 'new-key',
       };
 
       llmService.updateProvider(newProvider);
 
       // Check that model was created (it should be defined and have the correct modelId)
       expect((llmService as any).model).toBeDefined();
-      expect((llmService as any).model.modelId).toBe("new-model");
+      expect((llmService as any).model.modelId).toBe('new-model');
     });
 
-    it("should create OpenAI model when using OpenAI endpoint", () => {
+    it('should create OpenAI model when using OpenAI endpoint', () => {
       const openaiProvider: LLMProvider = {
-        name: "OpenAI",
-        endpoint: "https://api.openai.com/v1/chat/completions",
-        model: "gpt-4",
-        apiKey: "sk-test",
+        name: 'OpenAI',
+        endpoint: 'https://api.openai.com/v1/chat/completions',
+        model: 'gpt-4',
+        apiKey: 'sk-test',
       };
 
       llmService.updateProvider(openaiProvider);
 
       // Check that model was created
       expect((llmService as any).model).toBeDefined();
-      expect((llmService as any).model.modelId).toBe("gpt-4");
+      expect((llmService as any).model.modelId).toBe('gpt-4');
     });
   });
 });

@@ -12,7 +12,7 @@ import { MemoizedMarkdown } from './MemoizedMarkdown';
 
 /**
  * React-based Chat Interface with AI SDK Integration
- * 
+ *
  * This component provides a modern React-based chat interface that can work with
  * both the AI SDK backend and the legacy backend, maintaining backwards compatibility
  * while providing a path to full AI SDK migration.
@@ -33,16 +33,15 @@ const ChatInterface: React.FC = () => {
     initializeChat();
   }, []);
 
-
   // Set up storage listener for real-time updates
   useEffect(() => {
     const handleStorageChanges = (changes: any, areaName: string) => {
       if (isRefreshingRef.current) return;
-      
+
       if (areaName === 'local' && changes.settings && changes.settings.newValue) {
         const newSettings = changes.settings.newValue as ExtensionSettings;
         setSettings(newSettings);
-        
+
         // Update messages based on tab
         const tabHistory = getTabChatHistory(newSettings, tabId);
         setMessages(tabHistory);
@@ -50,7 +49,7 @@ const ChatInterface: React.FC = () => {
     };
 
     browser.storage.onChanged.addListener(handleStorageChanges);
-    
+
     return () => {
       browser.storage.onChanged.removeListener(handleStorageChanges);
     };
@@ -96,7 +95,7 @@ const ChatInterface: React.FC = () => {
 
   const loadSettings = async () => {
     sidepanelLogger.info('loadSettings starting...');
-    
+
     const message: MessageFromSidebar = {
       type: 'GET_SETTINGS',
       payload: null,
@@ -104,52 +103,75 @@ const ChatInterface: React.FC = () => {
 
     try {
       sidepanelLogger.debug('Sending GET_SETTINGS request');
-      const response = await browser.runtime.sendMessage(message) as MessageToSidebar;
-      
+      const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
+
       if (response.type === 'SETTINGS_RESPONSE') {
         const newSettings = response.payload;
-        sidepanelLogger.debug('Settings received', { hasSettings: !!newSettings, hasTabConversations: !!newSettings?.tabConversations });
+        sidepanelLogger.debug('Settings received', {
+          hasSettings: !!newSettings,
+          hasTabConversations: !!newSettings?.tabConversations,
+        });
         setSettings(newSettings);
-        
+
         // Update messages for current tab
-        sidepanelLogger.debug('About to call getTabChatHistory', { tabId, newSettingsType: typeof newSettings });
+        sidepanelLogger.debug('About to call getTabChatHistory', {
+          tabId,
+          newSettingsType: typeof newSettings,
+        });
         const tabHistory = getTabChatHistory(newSettings, tabId);
-        sidepanelLogger.debug('Tab history loaded', { messageCount: tabHistory?.length || 0, isArray: Array.isArray(tabHistory) });
+        sidepanelLogger.debug('Tab history loaded', {
+          messageCount: tabHistory?.length || 0,
+          isArray: Array.isArray(tabHistory),
+        });
         setMessages(tabHistory);
       }
     } catch (error) {
-      sidepanelLogger.error('Error in loadSettings', { error: error instanceof Error ? error.message : error });
-      setStatus({ text: 'Error loading settings. Please check your configuration.', type: 'error' });
+      sidepanelLogger.error('Error in loadSettings', {
+        error: error instanceof Error ? error.message : error,
+      });
+      setStatus({
+        text: 'Error loading settings. Please check your configuration.',
+        type: 'error',
+      });
     }
   };
 
-  const getTabChatHistory = (settings: ExtensionSettings | null, currentTabId: number | null): ChatMessage[] => {
-    sidepanelLogger.debug('getTabChatHistory called', { hasSettings: !!settings, currentTabId, settingsType: typeof settings });
-    
+  const getTabChatHistory = (
+    settings: ExtensionSettings | null,
+    currentTabId: number | null,
+  ): ChatMessage[] => {
+    sidepanelLogger.debug('getTabChatHistory called', {
+      hasSettings: !!settings,
+      currentTabId,
+      settingsType: typeof settings,
+    });
+
     if (!settings) {
       sidepanelLogger.debug('No settings, returning empty array');
       return [];
     }
-    
+
     if (!currentTabId) {
-      sidepanelLogger.debug('No tab ID, returning chatHistory', { chatHistoryLength: settings.chatHistory?.length || 0 });
+      sidepanelLogger.debug('No tab ID, returning chatHistory', {
+        chatHistoryLength: settings.chatHistory?.length || 0,
+      });
       return settings.chatHistory || [];
     }
-    
+
     const tabConversations = settings.tabConversations?.[currentTabId.toString()];
-    sidepanelLogger.debug('Tab conversations lookup', { 
-      hasTabConversations: !!settings.tabConversations, 
+    sidepanelLogger.debug('Tab conversations lookup', {
+      hasTabConversations: !!settings.tabConversations,
       tabKey: currentTabId.toString(),
       foundConversation: !!tabConversations,
-      conversationLength: tabConversations?.length || 0
+      conversationLength: tabConversations?.length || 0,
     });
-    
+
     return tabConversations || [];
   };
 
   const sendMessage = async () => {
     sidepanelLogger.info('sendMessage called', { inputValue: inputValue.substring(0, 50) });
-    
+
     const messageText = inputValue.trim();
     if (!messageText || isLoading) {
       sidepanelLogger.debug('sendMessage early return', { hasText: !!messageText, isLoading });
@@ -162,7 +184,10 @@ const ChatInterface: React.FC = () => {
       return;
     }
 
-    sidepanelLogger.debug('sendMessage proceeding', { messageText: messageText.substring(0, 50), hasSettings: !!settings });
+    sidepanelLogger.debug('sendMessage proceeding', {
+      messageText: messageText.substring(0, 50),
+      hasSettings: !!settings,
+    });
     setInputValue('');
     setIsLoading(true);
     setStatus({ text: 'Thinking...', type: 'thinking' });
@@ -173,9 +198,13 @@ const ChatInterface: React.FC = () => {
     };
 
     try {
-      sidepanelLogger.debug('About to send message to background script', { messageType: message.type });
-      const response = await browser.runtime.sendMessage(message) as MessageToSidebar;
-      sidepanelLogger.debug('Received response from background script', { responseType: response.type });
+      sidepanelLogger.debug('About to send message to background script', {
+        messageType: message.type,
+      });
+      const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
+      sidepanelLogger.debug('Received response from background script', {
+        responseType: response.type,
+      });
 
       if (response.type === 'MESSAGE_RESPONSE') {
         sidepanelLogger.info('Message response received successfully');
@@ -186,7 +215,9 @@ const ChatInterface: React.FC = () => {
         setStatus({ text: `Error: ${response.payload.error}`, type: 'error' });
       }
     } catch (error) {
-      sidepanelLogger.error('Exception in sendMessage', { error: error instanceof Error ? error.message : error });
+      sidepanelLogger.error('Exception in sendMessage', {
+        error: error instanceof Error ? error.message : error,
+      });
       setStatus({ text: 'Error sending message. Please try again.', type: 'error' });
     } finally {
       setIsLoading(false);
@@ -202,8 +233,8 @@ const ChatInterface: React.FC = () => {
         payload: { tabId },
       };
 
-      const response = await browser.runtime.sendMessage(message) as MessageToSidebar;
-      
+      const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
+
       if (response.type === 'SETTINGS_RESPONSE') {
         setSettings(response.payload);
         setMessages([]);
@@ -232,7 +263,7 @@ const ChatInterface: React.FC = () => {
     };
 
     try {
-      const response = await browser.runtime.sendMessage(message) as MessageToSidebar;
+      const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
 
       if (response.type === 'FUNCTION_RESPONSE') {
         const result = response.payload;
@@ -258,27 +289,38 @@ const ChatInterface: React.FC = () => {
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
 
   const MessageContentComponent: React.FC<{ content: MessageContent }> = ({ content }) => {
     if (!content) return null;
-    
+
     if (typeof content === 'string') {
-      return <MemoizedMarkdown content={content} id={`content-${Math.random().toString(36).substring(2, 11)}`} />;
+      return (
+        <MemoizedMarkdown
+          content={content}
+          id={`content-${Math.random().toString(36).substring(2, 11)}`}
+        />
+      );
     }
-    
+
     return (
       <>
         {content.map((item: any, index: number) => {
           if (item.type === 'text' && item.text) {
-            return <MemoizedMarkdown key={index} content={item.text} id={`text-${index}-${Math.random().toString(36).substring(2, 11)}`} />;
+            return (
+              <MemoizedMarkdown
+                key={index}
+                content={item.text}
+                id={`text-${index}-${Math.random().toString(36).substring(2, 11)}`}
+              />
+            );
           } else if (item.type === 'input_image' && item.image_url) {
             return (
               <div key={index} className="screenshot-container">
-                <img 
-                  src={item.image_url.url} 
-                  className="screenshot-thumbnail" 
+                <img
+                  src={item.image_url.url}
+                  className="screenshot-thumbnail"
                   style={{ cursor: 'pointer' }}
                   alt="Screenshot"
                 />
@@ -291,18 +333,18 @@ const ChatInterface: React.FC = () => {
     );
   };
 
-
   const ToolCallDisplay: React.FC<{ toolName: string; part: any }> = ({ toolName, part }) => {
     const input = part.input || {};
     const state = part.state || 'input-streaming';
-    
+
     const renderToolCall = () => (
       <div className="tool-call">
-        <strong>🛠️ Calling:</strong><br />
+        <strong>🛠️ Calling:</strong>
+        <br />
         {toolName}({JSON.stringify(input, null, 2)})
       </div>
     );
-    
+
     const renderExecuting = () => (
       <div className="tool-result executing">
         <strong>🔧 Tool Result:</strong>
@@ -324,19 +366,23 @@ const ChatInterface: React.FC = () => {
         return (
           <div className="tool-result">
             <strong>🔧 Tool Result:</strong>
-            <pre><code>{JSON.stringify(part.output, null, 2)}</code></pre>
+            <pre>
+              <code>{JSON.stringify(part.output, null, 2)}</code>
+            </pre>
           </div>
         );
       }
     };
-    
+
     const renderError = () => (
       <div className="tool-result">
         <strong>🔧 Tool Result:</strong>
-        <pre><code>Error: {part.errorText || 'Unknown error'}</code></pre>
+        <pre>
+          <code>Error: {part.errorText || 'Unknown error'}</code>
+        </pre>
       </div>
     );
-    
+
     switch (state) {
       case 'input-streaming':
       case 'input-available':
@@ -364,35 +410,43 @@ const ChatInterface: React.FC = () => {
         return null;
     }
   };
-  
+
   const MessagePart: React.FC<{ part: any; index: number }> = ({ part, index }) => {
     if (part.type === 'text') {
       if (part.text && part.text.trim()) {
         return (
           <div key={index} className="assistant-text">
-            <MemoizedMarkdown content={part.text} id={`part-${index}-${Math.random().toString(36).substring(2, 11)}`} />
+            <MemoizedMarkdown
+              content={part.text}
+              id={`part-${index}-${Math.random().toString(36).substring(2, 11)}`}
+            />
           </div>
         );
       }
       return null;
     }
-    
+
     if (part.type.startsWith('tool-')) {
       const toolName = part.type.replace('tool-', '');
       return <ToolCallDisplay key={index} toolName={toolName} part={part} />;
     }
-    
+
     sidepanelLogger.warn('Unknown part type', { partType: part.type, part });
     return null;
   };
-  
+
   const renderAssistantMessage = (message: ChatMessage) => {
-    sidepanelLogger.debug('renderAssistantMessage called', { messageId: message.id, hasContent: !!message.content });
-    
+    sidepanelLogger.debug('renderAssistantMessage called', {
+      messageId: message.id,
+      hasContent: !!message.content,
+    });
+
     // Process AI SDK UI parts structure
     if ((message as any).parts && Array.isArray((message as any).parts)) {
-      sidepanelLogger.debug('Processing message parts (AI SDK UI)', { partCount: (message as any).parts.length });
-      
+      sidepanelLogger.debug('Processing message parts (AI SDK UI)', {
+        partCount: (message as any).parts.length,
+      });
+
       return (
         <div className="assistant-message">
           {(message as any).parts.map((part: any, index: number) => (
@@ -403,7 +457,10 @@ const ChatInterface: React.FC = () => {
     } else {
       // Fallback to plain text content if no parts
       const textContent = (message as any).currentStreamingText || message.content;
-      if (textContent && (typeof textContent === 'string' ? textContent.trim() : textContent.length > 0)) {
+      if (
+        textContent &&
+        (typeof textContent === 'string' ? textContent.trim() : textContent.length > 0)
+      ) {
         return (
           <div className="assistant-text">
             <MessageContentComponent content={textContent} />
@@ -419,8 +476,17 @@ const ChatInterface: React.FC = () => {
       <header className="chat-header">
         <h1>LLM Chat</h1>
         <div className="header-buttons">
-          <button id="clear-btn" onClick={clearChat} className="clear-btn" title="Clear Chat">🗑️</button>
-          <button id="settings-btn" onClick={openSettings} className="settings-btn" title="Open Settings">⚙️</button>
+          <button id="clear-btn" onClick={clearChat} className="clear-btn" title="Clear Chat">
+            🗑️
+          </button>
+          <button
+            id="settings-btn"
+            onClick={openSettings}
+            className="settings-btn"
+            title="Open Settings"
+          >
+            ⚙️
+          </button>
         </div>
       </header>
 
@@ -429,53 +495,57 @@ const ChatInterface: React.FC = () => {
           {!messages || messages.length === 0 ? (
             <div className="welcome-message">
               <h3>Welcome to LLM Chat!</h3>
-              <p>Start a conversation with your configured LLM. The assistant can now autonomously use browser automation tools when enabled in settings.</p>
-              <p><strong>Available Tools:</strong> find elements, extract text, get page summary, describe sections, and clear references.</p>
+              <p>
+                Start a conversation with your configured LLM. The assistant can now autonomously
+                use browser automation tools when enabled in settings.
+              </p>
+              <p>
+                <strong>Available Tools:</strong> find elements, extract text, get page summary,
+                describe sections, and clear references.
+              </p>
             </div>
           ) : (
             (() => {
-              sidepanelLogger.debug('Rendering messages', { 
-                messageCount: messages?.length || 0, 
+              sidepanelLogger.debug('Rendering messages', {
+                messageCount: messages?.length || 0,
                 isArray: Array.isArray(messages),
-                messageTypes: (Array.isArray(messages) ? messages.filter(m => m).map(m => m.role) : [])
+                messageTypes: Array.isArray(messages)
+                  ? messages.filter((m) => m).map((m) => m.role)
+                  : [],
               });
               return (Array.isArray(messages) ? messages : [])
-                .filter(message => {
+                .filter((message) => {
                   if (!message) {
                     sidepanelLogger.warn('Found null/undefined message in filter');
                     return false;
                   }
                   return message.role !== 'tool';
                 }) // Hide tool messages as they're integrated into assistant messages
-              .map((message) => (
-                <div
-                  key={message.id}
-                  className={`message ${message.role} ${message.isStreaming ? 'streaming' : ''}`}
-                >
-                  {message.role === 'assistant' ? (
-                    renderAssistantMessage(message)
-                  ) : (
-                    <MessageContentComponent content={message.content} />
-                  )}
-                </div>
-              ));
+                .map((message) => (
+                  <div
+                    key={message.id}
+                    className={`message ${message.role} ${message.isStreaming ? 'streaming' : ''}`}
+                  >
+                    {message.role === 'assistant' ? (
+                      renderAssistantMessage(message)
+                    ) : (
+                      <MessageContentComponent content={message.content} />
+                    )}
+                  </div>
+                ));
             })()
           )}
-          <div ref={messagesEndRef} />
         </div>
+        <div ref={messagesEndRef} />
       </div>
-
 
       <div className="status-bar">
-        <span id="status" className={`status ${status.type || ''}`}>{status.text}</span>
+        <span id="status" className={`status ${status.type || ''}`}>
+          {status.text}
+        </span>
       </div>
 
-      <div className="test-controls">
-        <h4>Test LLMHelper Functions:</h4>
-        <button id="test-summary" onClick={() => testFunction('summary', {})} className="test-btn">Test Summary</button>
-        <button id="test-extract" onClick={() => testFunction('extract', {})} className="test-btn">Test Extract</button>
-        <button id="test-find" onClick={() => testFunction('find', { pattern: 'button|download|save', options: { limit: 5 } })} className="test-btn">Test Find Buttons</button>
-      </div>
+      <ManualToolInterface onExecuteTool={testFunction} isExecuting={isLoading} />
 
       <div className="input-container">
         <textarea

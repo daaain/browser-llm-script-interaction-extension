@@ -5,7 +5,7 @@ import type { ContentScriptFunctionRequest, ContentScriptFunctionResponse } from
 
 /**
  * AI SDK Tool Definitions
- * 
+ *
  * These tools provide the LLM with the ability to interact with web pages
  * through browser automation. Each tool is defined using the AI SDK's tool()
  * function with Zod schemas for type safety and automatic validation.
@@ -18,7 +18,7 @@ function convertStringBooleans(obj: any): any {
   if (obj === null || obj === undefined) {
     return obj;
   }
-  
+
   if (typeof obj === 'string') {
     // Convert string "true"/"false" to boolean, case-insensitive
     const lowerStr = obj.toLowerCase();
@@ -26,11 +26,11 @@ function convertStringBooleans(obj: any): any {
     if (lowerStr === 'false') return false;
     return obj;
   }
-  
+
   if (Array.isArray(obj)) {
     return obj.map(convertStringBooleans);
   }
-  
+
   if (typeof obj === 'object') {
     const converted: any = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -38,7 +38,7 @@ function convertStringBooleans(obj: any): any {
     }
     return converted;
   }
-  
+
   return obj;
 }
 
@@ -63,13 +63,13 @@ const booleanWithStringConversion = () => z.preprocess(booleanPreprocessor, z.bo
  * Execute a function in the content script context
  */
 async function executeContentScriptFunction(
-  functionName: string, 
-  args: any
+  functionName: string,
+  args: any,
 ): Promise<ContentScriptFunctionResponse> {
   try {
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
     const activeTab = tabs[0];
-    
+
     if (!activeTab?.id) {
       throw new Error('No active tab found');
     }
@@ -80,28 +80,33 @@ async function executeContentScriptFunction(
     const message: ContentScriptFunctionRequest = {
       type: 'EXECUTE_FUNCTION',
       function: functionName,
-      arguments: convertedArgs
+      arguments: convertedArgs,
     };
 
-    const response = await browser.tabs.sendMessage(activeTab.id, message) as ContentScriptFunctionResponse;
-    
+    const response = (await browser.tabs.sendMessage(
+      activeTab.id,
+      message,
+    )) as ContentScriptFunctionResponse;
+
     if (!response.success) {
       throw new Error(response.error || `Failed to execute ${functionName}`);
     }
-    
+
     return response;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`Error executing content script function ${functionName}:`, error);
-    
+
     // Provide more specific error information for debugging
     if (errorMessage.includes('not found')) {
-      console.warn(`Tool '${functionName}' is not implemented in the content script. Check if it needs to be added to the llm-helper.ts interface and content script switch statement.`);
+      console.warn(
+        `Tool '${functionName}' is not implemented in the content script. Check if it needs to be added to the llm-helper.ts interface and content script switch statement.`,
+      );
     }
-    
+
     return {
       success: false,
-      error: errorMessage
+      error: errorMessage,
     };
   }
 }
@@ -111,7 +116,8 @@ async function executeContentScriptFunction(
  * Captures a screenshot of the current page or viewport
  */
 export const screenshotTool = tool({
-  description: 'Capture a screenshot of the current page. Use this to see what the user is looking at or to analyze visual content.',
+  description:
+    'Capture a screenshot of the current page. Use this to see what the user is looking at or to analyze visual content.',
   inputSchema: z.object({
     fullPage: booleanWithStringConversion()
       .optional()
@@ -122,7 +128,7 @@ export const screenshotTool = tool({
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const activeTab = tabs[0];
-      
+
       if (!activeTab?.id) {
         throw new Error('No active tab found');
       }
@@ -130,7 +136,7 @@ export const screenshotTool = tool({
       // Capture screenshot using browser API
       const dataUrl = await browser.tabs.captureVisibleTab(undefined, {
         format: 'png',
-        quality: 90
+        quality: 90,
       });
 
       return {
@@ -138,17 +144,17 @@ export const screenshotTool = tool({
         success: true,
         dataUrl,
         timestamp: Date.now(),
-        fullPage
+        fullPage,
       };
     } catch (error) {
       console.error('Screenshot capture error:', error);
       return {
         type: 'screenshot',
         success: false,
-        error: error instanceof Error ? error.message : 'Screenshot capture failed'
+        error: error instanceof Error ? error.message : 'Screenshot capture failed',
       };
     }
-  }
+  },
 });
 
 /**

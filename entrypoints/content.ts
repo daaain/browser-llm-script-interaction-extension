@@ -1,9 +1,9 @@
-import browser from "webextension-polyfill";
+import browser from 'webextension-polyfill';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { createLLMHelper } from '~/utils/llm-helper';
 
 export default defineContentScript({
-  matches: ["<all_urls>"],
+  matches: ['<all_urls>'],
   main(_ctx) {
     // Create LLMHelper instance
     const LLMHelper = createLLMHelper();
@@ -13,11 +13,11 @@ export default defineContentScript({
 
     // Listen for messages from the extension
     browser.runtime.onMessage.addListener((request: any, _sender, sendResponse) => {
-      if (request.type === "EXECUTE_FUNCTION") {
+      if (request.type === 'EXECUTE_FUNCTION') {
         try {
           const functionName = request.function;
           const args = request.arguments || {};
-          
+
           if (functionName in LLMHelper) {
             // Handle function arguments properly based on function signature
             let result;
@@ -29,7 +29,7 @@ export default defineContentScript({
                 result = LLMHelper.click(args.selector);
                 break;
               case 'type':
-                result = LLMHelper.type(args.selector, args.text);
+                result = LLMHelper.type(args.selector, args.text, args.options);
                 break;
               case 'extract':
                 result = LLMHelper.extract(args.selector, args.property);
@@ -42,14 +42,16 @@ export default defineContentScript({
                 break;
               case 'screenshot':
                 // Handle screenshot asynchronously
-                LLMHelper.screenshot().then((dataUrl: string) => {
-                  sendResponse({ success: true, result: dataUrl });
-                }).catch((error: unknown) => {
-                  sendResponse({ 
-                    success: false, 
-                    error: error instanceof Error ? error.message : "Screenshot failed" 
+                LLMHelper.screenshot()
+                  .then((dataUrl: string) => {
+                    sendResponse({ success: true, result: dataUrl });
+                  })
+                  .catch((error: unknown) => {
+                    sendResponse({
+                      success: false,
+                      error: error instanceof Error ? error.message : 'Screenshot failed',
+                    });
                   });
-                });
                 return true; // Keep message channel open for async response
               default:
                 throw new Error(`Unknown function: ${functionName}`);
@@ -59,17 +61,17 @@ export default defineContentScript({
             return true;
           } else {
             const availableFunctions = Object.keys(LLMHelper).join(', ');
-            const response = { 
-              success: false, 
-              error: `Function '${functionName}' not found. Available functions: ${availableFunctions}` 
+            const response = {
+              success: false,
+              error: `Function '${functionName}' not found. Available functions: ${availableFunctions}`,
             };
             sendResponse(response);
             return true;
           }
         } catch (error) {
-          const response = { 
-            success: false, 
-            error: error instanceof Error ? error.message : "Unknown error" 
+          const response = {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
           };
           sendResponse(response);
           return true;
@@ -78,6 +80,6 @@ export default defineContentScript({
       return true; // Keep the message channel open for async responses
     });
 
-    console.debug("LLMHelper content script loaded");
+    console.debug('LLMHelper content script loaded');
   },
 });

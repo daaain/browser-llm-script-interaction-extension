@@ -299,22 +299,22 @@ body {
     flex-direction: column;
     padding: 8px 12px;
   }
-  
+
   .message-input {
     min-width: unset;
     margin-bottom: 8px;
   }
-  
+
   .send-btn {
     width: 100%;
     min-width: unset;
   }
-  
+
   .status-bar {
     bottom: auto;
     position: relative;
   }
-  
+
   .messages {
     padding: 12px;
   }
@@ -325,34 +325,34 @@ body {
   .message {
     max-width: 100%;
   }
-  
+
   .message.user {
     align-self: stretch;
     margin-left: 0;
   }
-  
+
   .message.assistant {
     align-self: stretch;
     margin-right: 0;
   }
-  
+
   .chat-header {
     padding: 6px 8px;
   }
-  
+
   .chat-header h1 {
     font-size: 1em;
   }
-  
+
   .input-container {
     padding: 6px 8px;
   }
-  
+
   .messages {
     padding: 8px;
     gap: 8px;
   }
-  
+
   .message {
     padding: 8px 12px;
   }
@@ -398,7 +398,7 @@ body {
   border-radius: 8px;
   padding: 5px 6px;
   margin: 4px 0;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 0.85em;
   color: #1976d2;
   width: 100%;
@@ -432,8 +432,13 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .tool-result strong {
@@ -463,15 +468,21 @@ body {
 
 /* Streaming message animation */
 .message.streaming::after {
-  content: '▋';
+  content: "▋";
   animation: blink 1s infinite;
   color: #007bff;
   margin-left: 2px;
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
 
 /* Debug Panel */
@@ -534,7 +545,7 @@ body {
 .debug-logs {
   flex: 1;
   padding: 0.5rem;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 0.7rem;
   line-height: 1.3;
   color: #495057;

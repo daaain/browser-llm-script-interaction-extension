@@ -126,15 +126,15 @@ export function createLLMHelper(): LLMHelperInterface {
   // Helper function to get text content from element
   function getElementText(element: Element): string {
     if (element instanceof HTMLInputElement) {
-      return element.value || element.placeholder || "";
+      return element.value || element.placeholder || '';
     }
     if (element instanceof HTMLTextAreaElement) {
-      return element.value || element.placeholder || "";
+      return element.value || element.placeholder || '';
     }
     if (element instanceof HTMLElement) {
-      return element.innerText || "";
+      return element.innerText || '';
     }
-    return element.textContent?.trim() || "";
+    return element.textContent?.trim() || '';
   }
 
   // Function to get settings from extension
@@ -456,14 +456,17 @@ export function createLLMHelper(): LLMHelperInterface {
     // Take a screenshot of the current tab
     async screenshot(): Promise<string> {
       try {
-        debugLog("screenshot() called");
-        
+        debugLog('screenshot() called');
+
         // Send message to background script to capture screenshot
         if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
           const response = await browser.runtime.sendMessage({ type: 'CAPTURE_SCREENSHOT' });
-          
+
           if (response && (response as any).success) {
-            debugLog("screenshot() successful", (response as any).dataUrl?.substring(0, 50) + '...');
+            debugLog(
+              'screenshot() successful',
+              (response as any).dataUrl?.substring(0, 50) + '...',
+            );
             return (response as any).dataUrl;
           } else {
             throw new Error((response as any)?.error || 'Screenshot failed - no response');
@@ -472,8 +475,10 @@ export function createLLMHelper(): LLMHelperInterface {
           throw new Error('Browser runtime not available');
         }
       } catch (error) {
-        console.error("LLMHelper.screenshot error:", error);
-        throw new Error(`Screenshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('LLMHelper.screenshot error:', error);
+        throw new Error(
+          `Screenshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
     },
 
@@ -490,29 +495,32 @@ export function createLLMHelper(): LLMHelperInterface {
         const children = element.children.length;
         const childTags = Array.from(element.children)
           .map((child) => child.tagName.toLowerCase())
-          .reduce((acc, tag) => {
-            acc[tag] = (acc[tag] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
+          .reduce(
+            (acc, tag) => {
+              acc[tag] = (acc[tag] || 0) + 1;
+              return acc;
+            },
+            {} as Record<string, number>,
+          );
 
         let description = `${tag} element`;
-        
+
         if (text) {
           description += ` with text: "${text}"`;
         }
-        
+
         if (children > 0) {
           description += `. Contains ${children} child elements`;
           const childSummary = Object.entries(childTags)
-            .map(([tag, count]) => `${count} ${tag}${count > 1 ? "s" : ""}`)
-            .join(", ");
+            .map(([tag, count]) => `${count} ${tag}${count > 1 ? 's' : ''}`)
+            .join(', ');
           description += `: ${childSummary}`;
         }
 
         return description;
       } catch (error) {
-        console.error("LLMHelper.describe error:", error);
-        return "Error describing element";
+        console.error('LLMHelper.describe error:', error);
+        return 'Error describing element';
       }
     },
   };

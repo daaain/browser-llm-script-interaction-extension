@@ -5,23 +5,25 @@ export interface LLMProvider {
   apiKey?: string;
 }
 
-export type MessageContent = string | Array<{
-  type: "text" | "input_image";
-  text?: string;
-  image_url?: {
-    url: string;
-  };
-}>;
+export type MessageContent =
+  | string
+  | Array<{
+      type: 'text' | 'input_image';
+      text?: string;
+      image_url?: {
+        url: string;
+      };
+    }>;
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "tool";
+  role: 'user' | 'assistant' | 'tool';
   content: MessageContent;
   timestamp: number;
   tool_calls?: LLMToolCall[];
   tool_call_id?: string;
   isStreaming?: boolean;
-  tool_results?: Array<{id: string, result: any, error?: string}>;
+  tool_results?: Array<{ id: string; result: any; error?: string }>;
   parentMessageId?: string;
   toolRound?: number;
 }
@@ -48,40 +50,59 @@ export interface LLMResponse {
 export type LLMToolCall = AISDKToolCall;
 
 export interface LLMTool {
-  type: "function";
+  type: 'function';
   function: {
     name: string;
     description: string;
     parameters: {
-      type: "object";
-      properties: Record<string, {
-        type: string;
-        description?: string;
-        enum?: string[];
-        properties?: Record<string, {
+      type: 'object';
+      properties: Record<
+        string,
+        {
           type: string;
           description?: string;
           enum?: string[];
-        }>;
-      }>;
+          properties?: Record<
+            string,
+            {
+              type: string;
+              description?: string;
+              enum?: string[];
+            }
+          >;
+        }
+      >;
       required?: string[];
     };
   };
 }
 
-
 export interface MessageFromSidebar {
-  type: "SEND_MESSAGE" | "GET_SETTINGS" | "SAVE_SETTINGS" | "EXECUTE_FUNCTION" | "CLEAR_TAB_CONVERSATION" | "CAPTURE_SCREENSHOT" | "TEST_CONNECTION";
+  type:
+    | 'SEND_MESSAGE'
+    | 'GET_SETTINGS'
+    | 'SAVE_SETTINGS'
+    | 'EXECUTE_FUNCTION'
+    | 'CLEAR_TAB_CONVERSATION'
+    | 'CAPTURE_SCREENSHOT'
+    | 'TEST_CONNECTION'
+    | 'GET_RESPONSE_PAGE';
   payload: any;
 }
 
 export interface MessageToSidebar {
-  type: "MESSAGE_RESPONSE" | "SETTINGS_RESPONSE" | "ERROR" | "FUNCTION_RESPONSE" | "TEST_CONNECTION_RESPONSE";
+  type:
+    | 'MESSAGE_RESPONSE'
+    | 'SETTINGS_RESPONSE'
+    | 'ERROR'
+    | 'FUNCTION_RESPONSE'
+    | 'TEST_CONNECTION_RESPONSE'
+    | 'RESPONSE_PAGE';
   payload: any;
 }
 
 export interface ContentScriptFunctionRequest {
-  type: "EXECUTE_FUNCTION";
+  type: 'EXECUTE_FUNCTION';
   function: string;
   arguments: any;
 }
@@ -114,25 +135,25 @@ export interface ExtensionSettings {
   toolsEnabled: boolean;
 }
 
-export const DEFAULT_PROVIDERS: Omit<LLMProvider, "apiKey">[] = [
+export const DEFAULT_PROVIDERS: Omit<LLMProvider, 'apiKey'>[] = [
   {
-    name: "LM Studio",
-    endpoint: "http://localhost:1234/v1/chat/completions",
-    model: "local-model",
+    name: 'LM Studio',
+    endpoint: 'http://localhost:1234/v1/chat/completions',
+    model: 'local-model',
   },
   {
-    name: "OpenAI",
-    endpoint: "https://api.openai.com/v1/chat/completions",
-    model: "gpt-4o",
+    name: 'OpenAI',
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-4o',
   },
   {
-    name: "Anthropic Claude (via OpenRouter)",
-    endpoint: "https://openrouter.ai/api/v1/chat/completions",
-    model: "anthropic/claude-3.5-sonnet",
+    name: 'Anthropic Claude (via OpenRouter)',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    model: 'anthropic/claude-3.5-sonnet',
   },
   {
-    name: "Custom",
-    endpoint: "",
-    model: "",
+    name: 'Custom',
+    endpoint: '',
+    model: '',
   },
 ];

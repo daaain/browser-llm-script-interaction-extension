@@ -1,16 +1,16 @@
-import { expect, test } from "./fixtures";
-import "./types";
+import { expect, test } from './fixtures';
+import './types';
 
-test.describe("Streaming Functionality", () => {
+test.describe('Streaming Functionality', () => {
   test.beforeEach(async ({ context }) => {
     // Ensure extension is loaded before each test
     const serviceWorkers = context.serviceWorkers();
     if (serviceWorkers.length === 0) {
-      await context.waitForEvent("serviceworker");
+      await context.waitForEvent('serviceworker');
     }
   });
 
-  test("should show streaming indicator CSS class", async ({ context, extensionId }) => {
+  test('should show streaming indicator CSS class', async ({ context, extensionId }) => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
@@ -21,7 +21,7 @@ test.describe("Streaming Functionality", () => {
         try {
           const rules = Array.from(sheet.cssRules || []);
           for (const rule of rules) {
-            if (rule.cssText.includes(".streaming") || rule.cssText.includes("message.streaming")) {
+            if (rule.cssText.includes('.streaming') || rule.cssText.includes('message.streaming')) {
               return true;
             }
           }
@@ -35,23 +35,23 @@ test.describe("Streaming Functionality", () => {
     expect(streamingCSSExists).toBe(true);
   });
 
-  test("should stream text with real LLM API and tool calls", async ({ context, extensionId }) => {
+  test('should stream text with real LLM API and tool calls', async ({ context, extensionId }) => {
     // First configure the extension
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
-    await optionsPage.locator("#endpoint-input").fill("http://localhost:1234/v1/chat/completions");
-    await optionsPage.locator("#model-input").fill("qwen/qwen3-coder-30b");
+    await optionsPage.locator('#endpoint-input').fill('http://localhost:1234/v1/chat/completions');
+    await optionsPage.locator('#model-input').fill('qwen/qwen3-coder-30b');
 
     // Enable tools by forcing the checkbox to be checked
-    const toolsCheckbox = optionsPage.locator("#tools-enabled");
+    const toolsCheckbox = optionsPage.locator('#tools-enabled');
 
     // Force set the checkbox via JavaScript to bypass any UI issues
     await optionsPage.evaluate(() => {
-      const checkbox = document.getElementById("tools-enabled") as HTMLInputElement;
+      const checkbox = document.getElementById('tools-enabled') as HTMLInputElement;
       if (checkbox && !checkbox.checked) {
         checkbox.checked = true;
         // Trigger change event to notify the form
-        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
       }
     });
 
@@ -72,7 +72,7 @@ test.describe("Streaming Functionality", () => {
 
     // Set up test page for tools to interact with - use a real website since content scripts don't run on extension pages
     const testPage = await context.newPage();
-    await testPage.goto("https://example.com");
+    await testPage.goto('https://example.com');
 
     // Open sidepanel
     const sidepanelPage = await context.newPage();
@@ -86,13 +86,13 @@ test.describe("Streaming Functionality", () => {
     await sidepanelPage.evaluate(() => {
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
-          if (mutation.type === "childList" || mutation.type === "characterData") {
-            const assistantMessages = document.querySelectorAll(".message.assistant");
+          if (mutation.type === 'childList' || mutation.type === 'characterData') {
+            const assistantMessages = document.querySelectorAll('.message.assistant');
             const lastMessage = assistantMessages[assistantMessages.length - 1] as HTMLElement;
             if (lastMessage) {
               (window as any).lastMessageUpdate = {
                 content: lastMessage.innerHTML,
-                isStreaming: lastMessage.classList.contains("streaming"),
+                isStreaming: lastMessage.classList.contains('streaming'),
                 timestamp: Date.now(),
               };
             }
@@ -100,7 +100,7 @@ test.describe("Streaming Functionality", () => {
         });
       });
 
-      const messagesEl = document.getElementById("messages");
+      const messagesEl = document.getElementById('messages');
       if (messagesEl) {
         observer.observe(messagesEl, {
           childList: true,
@@ -111,33 +111,33 @@ test.describe("Streaming Functionality", () => {
     });
 
     // Send a simple message first to verify basic streaming works
-    const messageInput = sidepanelPage.locator("#message-input");
-    await messageInput.fill("Hello! Just say hi back.");
+    const messageInput = sidepanelPage.locator('#message-input');
+    await messageInput.fill('Hello! Just say hi back.');
 
-    const sendBtn = sidepanelPage.locator("#send-btn");
+    const sendBtn = sidepanelPage.locator('#send-btn');
     await sendBtn.click();
 
     // Wait for streaming to start
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toBeVisible({
+    await expect(sidepanelPage.locator('.message.assistant.streaming')).toBeVisible({
       timeout: 10000,
     });
 
     // Wait for streaming to complete
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0, {
+    await expect(sidepanelPage.locator('.message.assistant.streaming')).toHaveCount(0, {
       timeout: 15000,
     });
 
     // Verify we got a response
-    const firstResponse = await sidepanelPage.locator(".message.assistant").textContent();
+    const firstResponse = await sidepanelPage.locator('.message.assistant').textContent();
     expect(firstResponse).toBeTruthy();
     expect(firstResponse).toMatch(/(hi|hello)/i);
 
     // Now send a message that should trigger tool calls (even if tools fail, we can test the UI)
-    await messageInput.fill("Please take a screenshot and describe what you see.");
+    await messageInput.fill('Please take a screenshot and describe what you see.');
     await sendBtn.click();
 
     // Wait for streaming to start
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toBeVisible({
+    await expect(sidepanelPage.locator('.message.assistant.streaming')).toBeVisible({
       timeout: 10000,
     });
 
@@ -170,13 +170,13 @@ test.describe("Streaming Functionality", () => {
     expect(isStreaming).toBe(false); // Should have finished streaming
 
     // Check final message - should contain tool calls even if they fail
-    const finalMessage = await sidepanelPage.locator(".message.assistant").last();
+    const finalMessage = await sidepanelPage.locator('.message.assistant').last();
     const finalContent = await finalMessage.innerHTML();
 
     // Check if tools were actually used (depends on LLM capability)
-    const hasToolCalls = finalContent.includes("tool-call");
-    const hasToolResults = finalContent.includes("tool-result");
-    const mentionsScreenshot = finalContent.toLowerCase().includes("screenshot");
+    const hasToolCalls = finalContent.includes('tool-call');
+    const hasToolResults = finalContent.includes('tool-result');
+    const mentionsScreenshot = finalContent.toLowerCase().includes('screenshot');
 
     console.log(`Tool calls present: ${hasToolCalls}`);
     console.log(`Tool results present: ${hasToolResults}`);
@@ -184,54 +184,54 @@ test.describe("Streaming Functionality", () => {
 
     if (hasToolCalls) {
       // If tool calls are present, expect tool results too
-      expect(finalContent).toContain("tool-result");
-      console.log("✅ Tool functionality working - found tool calls and results");
+      expect(finalContent).toContain('tool-result');
+      console.log('✅ Tool functionality working - found tool calls and results');
     } else {
       // If no tool calls, at least the LLM should acknowledge the request
       expect(mentionsScreenshot).toBeTruthy();
-      console.log("ℹ️ No tool calls found, but LLM acknowledged the request");
+      console.log('ℹ️ No tool calls found, but LLM acknowledged the request');
     }
 
     // Verify message is no longer streaming
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0);
+    await expect(sidepanelPage.locator('.message.assistant.streaming')).toHaveCount(0);
   });
 
-  test("should stream simple text without tool calls", async ({ context, extensionId }) => {
+  test('should stream simple text without tool calls', async ({ context, extensionId }) => {
     // Configure the extension first
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
-    await optionsPage.locator("#endpoint-input").fill("http://localhost:1234/v1/chat/completions");
-    await optionsPage.locator("#model-input").fill("qwen/qwen3-coder-30b");
+    await optionsPage.locator('#endpoint-input').fill('http://localhost:1234/v1/chat/completions');
+    await optionsPage.locator('#model-input').fill('qwen/qwen3-coder-30b');
     await optionsPage.waitForTimeout(2000); // Wait for auto-save
 
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
     // Send a simple message that shouldn't trigger tools
-    const messageInput = sidepanelPage.locator("#message-input");
+    const messageInput = sidepanelPage.locator('#message-input');
     await messageInput.fill(
-      "Just say hello and explain what you are in a few sentences. No tools needed.",
+      'Just say hello and explain what you are in a few sentences. No tools needed.',
     );
 
-    const sendBtn = sidepanelPage.locator("#send-btn");
+    const sendBtn = sidepanelPage.locator('#send-btn');
     await sendBtn.click();
 
     // Wait for streaming to start
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toBeVisible({
+    await expect(sidepanelPage.locator('.message.assistant.streaming')).toBeVisible({
       timeout: 10000,
     });
 
     // Wait for streaming to complete
-    await expect(sidepanelPage.locator(".message.assistant.streaming")).toHaveCount(0, {
+    await expect(sidepanelPage.locator('.message.assistant.streaming')).toHaveCount(0, {
       timeout: 15000,
     });
 
     // Verify final message
-    const finalMessage = await sidepanelPage.locator(".message.assistant").last();
+    const finalMessage = await sidepanelPage.locator('.message.assistant').last();
     const finalContent = await finalMessage.textContent();
 
     expect(finalContent).toMatch(/(hello|assistant|AI)/i);
-    expect(finalContent).not.toContain("tool-call");
-    expect(finalContent).not.toContain("tool-result");
+    expect(finalContent).not.toContain('tool-call');
+    expect(finalContent).not.toContain('tool-result');
   });
 });

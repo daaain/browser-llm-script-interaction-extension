@@ -1,12 +1,12 @@
 /**
  * Cross-Thread Debug Logger
- * 
+ *
  * This utility provides logging that works across different extension contexts
  * (background worker, sidepanel, content scripts) by storing logs in extension
  * storage and providing a way to view them from the UI.
  */
 
-import browser from "webextension-polyfill";
+import browser from 'webextension-polyfill';
 
 export interface LogEntry {
   timestamp: number;
@@ -57,7 +57,7 @@ export class DebugLogger {
       level,
       context: this.context,
       message,
-      data
+      data,
     };
 
     // Always log to browser console as well
@@ -80,12 +80,12 @@ export class DebugLogger {
     try {
       const logs = await this.getLogs();
       logs.push(logEntry);
-      
+
       // Keep only the last maxLogs entries
       if (logs.length > this.maxLogs) {
         logs.splice(0, logs.length - this.maxLogs);
       }
-      
+
       await this.storeLogs(logs);
     } catch (error) {
       console.error('Failed to add debug log:', error);
@@ -124,7 +124,7 @@ export class DebugLogger {
     const logs = await this.getLogs();
     return logs
       .slice(-50) // Show last 50 logs
-      .map(log => {
+      .map((log) => {
         const time = new Date(log.timestamp).toISOString();
         const dataStr = log.data ? ` | ${JSON.stringify(log.data)}` : '';
         return `[${time}] [${log.level.toUpperCase()}] [${log.context.toUpperCase()}] ${log.message}${dataStr}`;
@@ -139,12 +139,14 @@ export class DebugLogger {
     try {
       const logs = await this.getLogsForDisplay();
       // Try to send to sidepanel if it exists
-      browser.runtime.sendMessage({
-        type: 'DEBUG_LOGS_UPDATE',
-        payload: { logs }
-      }).catch(() => {
-        // Ignore errors if sidepanel isn't listening
-      });
+      browser.runtime
+        .sendMessage({
+          type: 'DEBUG_LOGS_UPDATE',
+          payload: { logs },
+        })
+        .catch(() => {
+          // Ignore errors if sidepanel isn't listening
+        });
     } catch (error) {
       console.error('Failed to send logs to sidepanel:', error);
     }

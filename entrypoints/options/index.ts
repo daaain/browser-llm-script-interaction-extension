@@ -1,7 +1,7 @@
-import browser from "webextension-polyfill";
-import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from "~/utils/types";
-import { DEFAULT_PROVIDERS } from "~/utils/types";
-import { DEFAULT_TRUNCATION_LIMIT } from "~/utils/constants";
+import browser from 'webextension-polyfill';
+import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from '~/utils/types';
+import { DEFAULT_PROVIDERS } from '~/utils/types';
+import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
 
 class SettingsManager {
   private currentSettings: ExtensionSettings | null = null;
@@ -18,33 +18,33 @@ class SettingsManager {
   }
 
   private async loadSettings() {
-    console.debug("Loading settings...");
+    console.debug('Loading settings...');
 
     const message: MessageFromSidebar = {
-      type: "GET_SETTINGS",
+      type: 'GET_SETTINGS',
       payload: null,
     };
 
     try {
       const response = (await browser.runtime.sendMessage(message)) as MessageToSidebar;
-      console.debug("Settings response:", JSON.stringify(response));
+      console.debug('Settings response:', JSON.stringify(response));
 
-      if (response.type === "SETTINGS_RESPONSE") {
+      if (response.type === 'SETTINGS_RESPONSE') {
         this.currentSettings = response.payload;
         this.populateForm();
-        console.debug("Settings loaded successfully");
+        console.debug('Settings loaded successfully');
       }
     } catch (error) {
-      console.error("Error loading settings:", error);
-      this.showMessage("Error loading settings. Please try refreshing.", "error");
+      console.error('Error loading settings:', error);
+      this.showMessage('Error loading settings. Please try refreshing.', 'error');
     }
   }
 
   private populateProviderSelect() {
-    const select = document.getElementById("provider-select") as HTMLSelectElement;
+    const select = document.getElementById('provider-select') as HTMLSelectElement;
 
     DEFAULT_PROVIDERS.forEach((provider, index) => {
-      const option = document.createElement("option");
+      const option = document.createElement('option');
       option.value = index.toString();
       option.textContent = provider.name;
       select.appendChild(option);
@@ -59,34 +59,36 @@ class SettingsManager {
     );
 
     if (providerIndex !== -1) {
-      (document.getElementById("provider-select") as HTMLSelectElement).value =
+      (document.getElementById('provider-select') as HTMLSelectElement).value =
         providerIndex.toString();
     }
 
-    (document.getElementById("endpoint-input") as HTMLInputElement).value =
+    (document.getElementById('endpoint-input') as HTMLInputElement).value =
       this.currentSettings.provider.endpoint;
-    (document.getElementById("model-input") as HTMLInputElement).value =
+    (document.getElementById('model-input') as HTMLInputElement).value =
       this.currentSettings.provider.model;
-    (document.getElementById("api-key-input") as HTMLInputElement).value =
-      this.currentSettings.provider.apiKey || "";
-    (document.getElementById("debug-mode") as HTMLInputElement).checked =
+    (document.getElementById('api-key-input') as HTMLInputElement).value =
+      this.currentSettings.provider.apiKey || '';
+    (document.getElementById('debug-mode') as HTMLInputElement).checked =
       this.currentSettings.debugMode || false;
-    (document.getElementById("tools-enabled") as HTMLInputElement).checked =
+    (document.getElementById('tools-enabled') as HTMLInputElement).checked =
       this.currentSettings.toolsEnabled || false;
-    (document.getElementById("truncation-limit-input") as HTMLInputElement).value =
+    (document.getElementById('truncation-limit-input') as HTMLInputElement).value =
       this.currentSettings.truncationLimit?.toString() || DEFAULT_TRUNCATION_LIMIT.toString();
   }
 
   private setupEventListeners() {
-    const providerSelect = document.getElementById("provider-select") as HTMLSelectElement;
-    const endpointInput = document.getElementById("endpoint-input") as HTMLInputElement;
-    const modelInput = document.getElementById("model-input") as HTMLInputElement;
-    const apiKeyInput = document.getElementById("api-key-input") as HTMLInputElement;
-    const truncationLimitInput = document.getElementById("truncation-limit-input") as HTMLInputElement;
-    const testButton = document.getElementById("test-connection") as HTMLButtonElement;
-    const clearHistoryButton = document.getElementById("clear-history") as HTMLButtonElement;
+    const providerSelect = document.getElementById('provider-select') as HTMLSelectElement;
+    const endpointInput = document.getElementById('endpoint-input') as HTMLInputElement;
+    const modelInput = document.getElementById('model-input') as HTMLInputElement;
+    const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement;
+    const truncationLimitInput = document.getElementById(
+      'truncation-limit-input',
+    ) as HTMLInputElement;
+    const testButton = document.getElementById('test-connection') as HTMLButtonElement;
+    const clearHistoryButton = document.getElementById('clear-history') as HTMLButtonElement;
 
-    providerSelect.addEventListener("change", () => {
+    providerSelect.addEventListener('change', () => {
       const selectedIndex = parseInt(providerSelect.value, 10);
       if (selectedIndex >= 0 && selectedIndex < DEFAULT_PROVIDERS.length) {
         const provider = DEFAULT_PROVIDERS[selectedIndex];
@@ -97,21 +99,20 @@ class SettingsManager {
     });
 
     // Auto-save on input changes
-    endpointInput.addEventListener("input", () => this.autoSave());
-    modelInput.addEventListener("input", () => this.autoSave());
-    apiKeyInput.addEventListener("input", () => this.autoSave());
-    truncationLimitInput.addEventListener("input", () => this.autoSave());
-    
+    endpointInput.addEventListener('input', () => this.autoSave());
+    modelInput.addEventListener('input', () => this.autoSave());
+    apiKeyInput.addEventListener('input', () => this.autoSave());
+    truncationLimitInput.addEventListener('input', () => this.autoSave());
+
     // Auto-save for checkboxes
-    const debugModeCheckbox = document.getElementById("debug-mode") as HTMLInputElement;
-    const toolsEnabledCheckbox = document.getElementById("tools-enabled") as HTMLInputElement;
-    debugModeCheckbox.addEventListener("change", () => this.autoSave());
-    toolsEnabledCheckbox.addEventListener("change", () => this.autoSave());
+    const debugModeCheckbox = document.getElementById('debug-mode') as HTMLInputElement;
+    const toolsEnabledCheckbox = document.getElementById('tools-enabled') as HTMLInputElement;
+    debugModeCheckbox.addEventListener('change', () => this.autoSave());
+    toolsEnabledCheckbox.addEventListener('change', () => this.autoSave());
 
-    testButton.addEventListener("click", () => this.testConnection());
-    clearHistoryButton.addEventListener("click", () => this.clearHistory());
+    testButton.addEventListener('click', () => this.testConnection());
+    clearHistoryButton.addEventListener('click', () => this.clearHistory());
   }
-
 
   private autoSave() {
     // Clear existing timeout to debounce rapid changes
@@ -127,12 +128,16 @@ class SettingsManager {
 
   private async saveSettingsQuietly() {
     try {
-      const endpoint = (document.getElementById("endpoint-input") as HTMLInputElement).value;
-      const model = (document.getElementById("model-input") as HTMLInputElement).value;
-      const apiKey = (document.getElementById("api-key-input") as HTMLInputElement).value;
-      const debugMode = (document.getElementById("debug-mode") as HTMLInputElement).checked;
-      const toolsEnabled = (document.getElementById("tools-enabled") as HTMLInputElement).checked;
-      const truncationLimit = parseInt((document.getElementById("truncation-limit-input") as HTMLInputElement).value, 10) || DEFAULT_TRUNCATION_LIMIT;
+      const endpoint = (document.getElementById('endpoint-input') as HTMLInputElement).value;
+      const model = (document.getElementById('model-input') as HTMLInputElement).value;
+      const apiKey = (document.getElementById('api-key-input') as HTMLInputElement).value;
+      const debugMode = (document.getElementById('debug-mode') as HTMLInputElement).checked;
+      const toolsEnabled = (document.getElementById('tools-enabled') as HTMLInputElement).checked;
+      const truncationLimit =
+        parseInt(
+          (document.getElementById('truncation-limit-input') as HTMLInputElement).value,
+          10,
+        ) || DEFAULT_TRUNCATION_LIMIT;
 
       // Don't auto-save if required fields are empty
       if (!endpoint || !model) {
@@ -142,7 +147,7 @@ class SettingsManager {
       const updatedSettings: ExtensionSettings = {
         ...this.currentSettings!,
         provider: {
-          name: "Custom",
+          name: 'Custom',
           endpoint,
           model,
           apiKey: apiKey || undefined,
@@ -153,26 +158,26 @@ class SettingsManager {
       };
 
       const message: MessageFromSidebar = {
-        type: "SAVE_SETTINGS",
+        type: 'SAVE_SETTINGS',
         payload: updatedSettings,
       };
 
       await browser.runtime.sendMessage(message);
       this.currentSettings = updatedSettings;
     } catch (error) {
-      console.error("Error auto-saving settings:", error);
+      console.error('Error auto-saving settings:', error);
     }
   }
 
   private async testConnection() {
-    this.showMessage("Testing connection...", "info");
+    this.showMessage('Testing connection...', 'info');
 
-    const endpoint = (document.getElementById("endpoint-input") as HTMLInputElement).value;
-    const model = (document.getElementById("model-input") as HTMLInputElement).value;
-    const apiKey = (document.getElementById("api-key-input") as HTMLInputElement).value;
+    const endpoint = (document.getElementById('endpoint-input') as HTMLInputElement).value;
+    const model = (document.getElementById('model-input') as HTMLInputElement).value;
+    const apiKey = (document.getElementById('api-key-input') as HTMLInputElement).value;
 
     if (!endpoint || !model) {
-      this.showMessage("Please fill in endpoint and model fields first", "error");
+      this.showMessage('Please fill in endpoint and model fields first', 'error');
       return;
     }
 
@@ -181,7 +186,7 @@ class SettingsManager {
       const updatedSettings: ExtensionSettings = {
         ...this.currentSettings!,
         provider: {
-          name: (document.getElementById("provider-select") as HTMLInputElement).value || "Custom",
+          name: (document.getElementById('provider-select') as HTMLInputElement).value || 'Custom',
           endpoint,
           model,
           apiKey: apiKey || undefined,
@@ -190,7 +195,7 @@ class SettingsManager {
 
       // Save settings first
       const saveMessage: MessageFromSidebar = {
-        type: "SAVE_SETTINGS",
+        type: 'SAVE_SETTINGS',
         payload: updatedSettings,
       };
       await browser.runtime.sendMessage(saveMessage);
@@ -198,36 +203,35 @@ class SettingsManager {
 
       // Now test the connection using the background script
       const testMessage: MessageFromSidebar = {
-        type: "TEST_CONNECTION",
+        type: 'TEST_CONNECTION',
         payload: {},
       };
-      
-      const response = await browser.runtime.sendMessage(testMessage) as MessageToSidebar;
 
-      if (response.type === "TEST_CONNECTION_RESPONSE") {
+      const response = (await browser.runtime.sendMessage(testMessage)) as MessageToSidebar;
+
+      if (response.type === 'TEST_CONNECTION_RESPONSE') {
         if (response.payload.success) {
-          this.showMessage("Connection test successful!", "success");
+          this.showMessage('Connection test successful!', 'success');
         } else {
           this.showMessage(
-            `Connection test failed: ${response.payload.error || "Unknown error"}`,
-            "error",
+            `Connection test failed: ${response.payload.error || 'Unknown error'}`,
+            'error',
           );
         }
-      } else if (response.type === "ERROR") {
+      } else if (response.type === 'ERROR') {
         this.showMessage(
-          `Connection test failed: ${response.payload.error || "Unknown error"}`,
-          "error",
+          `Connection test failed: ${response.payload.error || 'Unknown error'}`,
+          'error',
         );
       }
     } catch (error) {
-      console.error("Connection test failed:", error);
+      console.error('Connection test failed:', error);
       this.showMessage(
-        `Connection test failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "error",
+        `Connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'error',
       );
     }
   }
-
 
   private async clearHistory() {
     if (!this.currentSettings) return;
@@ -238,28 +242,28 @@ class SettingsManager {
     };
 
     const message: MessageFromSidebar = {
-      type: "SAVE_SETTINGS",
+      type: 'SAVE_SETTINGS',
       payload: updatedSettings,
     };
 
     try {
       await browser.runtime.sendMessage(message);
       this.currentSettings = updatedSettings;
-      this.showMessage("Chat history cleared successfully!", "success");
+      this.showMessage('Chat history cleared successfully!', 'success');
     } catch (error) {
-      console.error("Error clearing history:", error);
-      this.showMessage("Error clearing history. Please try again.", "error");
+      console.error('Error clearing history:', error);
+      this.showMessage('Error clearing history. Please try again.', 'error');
     }
   }
 
-  private showMessage(text: string, type: "success" | "error" | "info") {
-    const statusElement = document.getElementById("status-message") as HTMLDivElement;
+  private showMessage(text: string, type: 'success' | 'error' | 'info') {
+    const statusElement = document.getElementById('status-message') as HTMLDivElement;
     statusElement.textContent = text;
     statusElement.className = `status-message ${type}`;
 
     setTimeout(() => {
-      statusElement.style.display = "none";
-      statusElement.className = "status-message";
+      statusElement.style.display = 'none';
+      statusElement.className = 'status-message';
     }, 5000);
   }
 }

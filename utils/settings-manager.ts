@@ -1,7 +1,7 @@
-import browser from "webextension-polyfill";
-import type { ExtensionSettings } from "~/utils/types";
-import { DEFAULT_PROVIDERS } from "~/utils/types";
-import { DEFAULT_TRUNCATION_LIMIT } from "~/utils/constants";
+import browser from 'webextension-polyfill';
+import type { ExtensionSettings } from '~/utils/types';
+import { DEFAULT_PROVIDERS } from '~/utils/types';
+import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
 
 export class SettingsManager {
   private static instance: SettingsManager;
@@ -14,47 +14,47 @@ export class SettingsManager {
   }
 
   async getSettings(): Promise<ExtensionSettings> {
-    console.debug("Getting settings from storage...");
+    console.debug('Getting settings from storage...');
 
     try {
-      const result = await browser.storage.local.get(["settings"]);
-      console.debug("Storage result:", JSON.stringify(result));
+      const result = await browser.storage.local.get(['settings']);
+      console.debug('Storage result:', JSON.stringify(result));
 
       if (result.settings) {
-        console.debug("Found existing settings");
+        console.debug('Found existing settings');
         const settings = result.settings as ExtensionSettings;
         let needsUpdate = false;
-        
+
         if (typeof settings.debugMode === 'undefined') {
           settings.debugMode = true;
           needsUpdate = true;
-          console.debug("Added missing debugMode to existing settings");
+          console.debug('Added missing debugMode to existing settings');
         }
-        
+
         if (typeof settings.truncationLimit === 'undefined') {
           settings.truncationLimit = DEFAULT_TRUNCATION_LIMIT;
           needsUpdate = true;
-          console.debug("Added missing truncationLimit to existing settings");
+          console.debug('Added missing truncationLimit to existing settings');
         }
-        
+
         if (typeof settings.toolsEnabled === 'undefined') {
           settings.toolsEnabled = true;
           needsUpdate = true;
-          console.debug("Added missing toolsEnabled to existing settings");
+          console.debug('Added missing toolsEnabled to existing settings');
         }
-        
+
         if (needsUpdate) {
           await browser.storage.local.set({ settings });
         }
-        
+
         return settings;
       }
 
-      console.debug("No settings found, creating defaults");
+      console.debug('No settings found, creating defaults');
       const defaultSettings: ExtensionSettings = {
         provider: {
           ...DEFAULT_PROVIDERS[0],
-          apiKey: "",
+          apiKey: '',
         },
         chatHistory: [],
         debugMode: true,
@@ -63,22 +63,22 @@ export class SettingsManager {
       };
 
       await browser.storage.local.set({ settings: defaultSettings });
-      console.debug("Default settings saved");
+      console.debug('Default settings saved');
       return defaultSettings;
     } catch (error) {
-      console.error("Error accessing storage:", error);
+      console.error('Error accessing storage:', error);
       throw error;
     }
   }
 
   async saveSettings(settings: ExtensionSettings): Promise<void> {
-    console.debug("Saving settings:", JSON.stringify(settings));
+    console.debug('Saving settings:', JSON.stringify(settings));
 
     try {
       await browser.storage.local.set({ settings });
-      console.debug("Settings saved successfully");
+      console.debug('Settings saved successfully');
     } catch (error) {
-      console.error("Error saving settings:", error);
+      console.error('Error saving settings:', error);
       throw error;
     }
   }
@@ -88,13 +88,13 @@ export class SettingsManager {
       const settings = await this.getSettings();
       const tabConversations = settings.tabConversations || {};
       tabConversations[tabId.toString()] = conversation;
-      
+
       await this.saveSettings({
         ...settings,
-        tabConversations
+        tabConversations,
       });
     } catch (error) {
-      console.error("Error updating tab conversation:", error);
+      console.error('Error updating tab conversation:', error);
       throw error;
     }
   }
@@ -104,10 +104,10 @@ export class SettingsManager {
       const settings = await this.getSettings();
       await this.saveSettings({
         ...settings,
-        chatHistory: conversation
+        chatHistory: conversation,
       });
     } catch (error) {
-      console.error("Error updating global history:", error);
+      console.error('Error updating global history:', error);
       throw error;
     }
   }
@@ -115,18 +115,18 @@ export class SettingsManager {
   async clearTabConversation(tabId: number): Promise<ExtensionSettings> {
     try {
       const settings = await this.getSettings();
-      
+
       if (settings.tabConversations && settings.tabConversations[tabId.toString()]) {
         delete settings.tabConversations[tabId.toString()];
       }
-      
+
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const activeTabId = tabs[0]?.id;
-      
+
       if (activeTabId === tabId) {
         settings.chatHistory = [];
       }
-      
+
       await this.saveSettings(settings);
       return settings;
     } catch (error) {
@@ -137,11 +137,11 @@ export class SettingsManager {
 
   async getTabConversation(tabId?: number): Promise<any[]> {
     const settings = await this.getSettings();
-    
+
     if (tabId) {
       return settings.tabConversations?.[tabId.toString()] || [];
     }
-    
+
     return settings.chatHistory;
   }
 }

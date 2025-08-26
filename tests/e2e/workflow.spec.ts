@@ -1,17 +1,17 @@
-import { expect, test } from "./fixtures";
-import { testSettings } from "./test-constants";
-import "./types";
+import { expect, test } from './fixtures';
+import { testSettings } from './test-constants';
+import './types';
 
-test.describe("Complete User Workflow", () => {
-  test("should complete full setup and usage workflow", async ({ context, extensionId }) => {
+test.describe('Complete User Workflow', () => {
+  test('should complete full setup and usage workflow', async ({ context, extensionId }) => {
     // Step 1: Configure settings
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
 
     // Configure LM Studio settings for testing
-    await optionsPage.fill("#endpoint-input", testSettings.lmstudio.endpoint);
-    await optionsPage.fill("#model-input", testSettings.lmstudio.model);
-    await optionsPage.fill("#api-key-input", testSettings.lmstudio.apiKey);
+    await optionsPage.fill('#endpoint-input', testSettings.lmstudio.endpoint);
+    await optionsPage.fill('#model-input', testSettings.lmstudio.model);
+    await optionsPage.fill('#api-key-input', testSettings.lmstudio.apiKey);
 
     // Settings auto-save, wait for save operation
     await optionsPage.waitForTimeout(1000);
@@ -21,15 +21,15 @@ test.describe("Complete User Workflow", () => {
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
     // Verify UI is ready
-    await expect(sidepanelPage.locator("h1")).toContainText("LLM Chat");
-    await expect(sidepanelPage.locator("#message-input")).toBeVisible();
-    await expect(sidepanelPage.locator("#send-btn")).toBeVisible();
+    await expect(sidepanelPage.locator('h1')).toContainText('LLM Chat');
+    await expect(sidepanelPage.locator('#message-input')).toBeVisible();
+    await expect(sidepanelPage.locator('#send-btn')).toBeVisible();
 
     // Step 3: Test message sending (UI only, since we can't test actual LLM)
-    const messageInput = sidepanelPage.locator("#message-input");
-    const sendBtn = sidepanelPage.locator("#send-btn");
+    const messageInput = sidepanelPage.locator('#message-input');
+    const sendBtn = sidepanelPage.locator('#send-btn');
 
-    await messageInput.fill("Hello, can you help me?");
+    await messageInput.fill('Hello, can you help me?');
     await expect(sendBtn).toBeEnabled();
 
     // Click send
@@ -39,44 +39,44 @@ test.describe("Complete User Workflow", () => {
     await sidepanelPage.waitForTimeout(1000);
 
     // Step 5: Test settings accessibility
-    const settingsBtn = sidepanelPage.locator("#settings-btn");
+    const settingsBtn = sidepanelPage.locator('#settings-btn');
     await expect(settingsBtn).toBeVisible();
     await expect(settingsBtn).toBeEnabled();
 
     // Step 6: Return to options and test clear history
     await optionsPage.bringToFront();
-    const clearBtn = optionsPage.locator("#clear-history");
+    const clearBtn = optionsPage.locator('#clear-history');
     await clearBtn.click();
 
     // Should handle gracefully
     await optionsPage.waitForTimeout(500);
   });
 
-  test("should handle multiple configuration changes", async ({ context, extensionId }) => {
+  test('should handle multiple configuration changes', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/options.html`);
 
     // Test LM Studio configuration
-    await page.fill("#endpoint-input", testSettings.lmstudio.endpoint);
-    await page.fill("#model-input", testSettings.lmstudio.model);
+    await page.fill('#endpoint-input', testSettings.lmstudio.endpoint);
+    await page.fill('#model-input', testSettings.lmstudio.model);
     // Settings auto-save, wait for save operation
     await page.waitForTimeout(1000);
 
     // Switch to OpenAI configuration
-    await page.fill("#endpoint-input", testSettings.openai.endpoint);
-    await page.fill("#model-input", testSettings.openai.model);
-    await page.fill("#api-key-input", testSettings.openai.apiKey);
+    await page.fill('#endpoint-input', testSettings.openai.endpoint);
+    await page.fill('#model-input', testSettings.openai.model);
+    await page.fill('#api-key-input', testSettings.openai.apiKey);
     // Settings auto-save, wait for save operation
     await page.waitForTimeout(1000);
 
     // Verify the latest settings are saved
     await page.reload();
-    expect(await page.inputValue("#endpoint-input")).toBe(testSettings.openai.endpoint);
-    expect(await page.inputValue("#model-input")).toBe(testSettings.openai.model);
-    expect(await page.inputValue("#api-key-input")).toBe(testSettings.openai.apiKey);
+    expect(await page.inputValue('#endpoint-input')).toBe(testSettings.openai.endpoint);
+    expect(await page.inputValue('#model-input')).toBe(testSettings.openai.model);
+    expect(await page.inputValue('#api-key-input')).toBe(testSettings.openai.apiKey);
   });
 
-  test("should maintain state between page reloads", async ({ context, extensionId }) => {
+  test('should maintain state between page reloads', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/options.html`);
 
@@ -84,11 +84,11 @@ test.describe("Complete User Workflow", () => {
     await page.waitForTimeout(1000);
 
     // Set some configuration (using unique URL to avoid test interference)
-    const testEndpoint = "https://test-persistence.example.com/v1/chat/completions";
-    const testModel = "test-persistence-model";
+    const testEndpoint = 'https://test-persistence.example.com/v1/chat/completions';
+    const testModel = 'test-persistence-model';
 
-    await page.fill("#endpoint-input", testEndpoint);
-    await page.fill("#model-input", testModel);
+    await page.fill('#endpoint-input', testEndpoint);
+    await page.fill('#model-input', testModel);
     // Settings auto-save, wait for save operation
     await page.waitForTimeout(1000);
 
@@ -102,42 +102,42 @@ test.describe("Complete User Workflow", () => {
     await page.waitForTimeout(1000);
 
     // Settings should be preserved
-    expect(await page.inputValue("#endpoint-input")).toBe(testEndpoint);
-    expect(await page.inputValue("#model-input")).toBe(testModel);
+    expect(await page.inputValue('#endpoint-input')).toBe(testEndpoint);
+    expect(await page.inputValue('#model-input')).toBe(testModel);
   });
 
-  test("should handle form validation edge cases", async ({ context, extensionId }) => {
+  test('should handle form validation edge cases', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/options.html`);
 
     // Test empty endpoint
-    await page.fill("#endpoint-input", "");
-    await page.fill("#model-input", "test-model");
+    await page.fill('#endpoint-input', '');
+    await page.fill('#model-input', 'test-model');
 
     // Try to save - should handle gracefully
     // Settings auto-save, wait for save operation
     await page.waitForTimeout(1000);
 
     // Test invalid URL
-    await page.fill("#endpoint-input", "not-a-url");
+    await page.fill('#endpoint-input', 'not-a-url');
     // Settings auto-save, wait for save operation
     await page.waitForTimeout(1000);
 
     // Form should handle validation
     const validity = await page
-      .locator("#endpoint-input")
+      .locator('#endpoint-input')
       .evaluate((el: HTMLInputElement) => el.validity.valid);
     expect(validity).toBe(false);
 
     // Test valid URL
-    await page.fill("#endpoint-input", "https://api.example.com/v1/chat/completions");
+    await page.fill('#endpoint-input', 'https://api.example.com/v1/chat/completions');
     const newValidity = await page
-      .locator("#endpoint-input")
+      .locator('#endpoint-input')
       .evaluate((el: HTMLInputElement) => el.validity.valid);
     expect(newValidity).toBe(true);
   });
 
-  test("should execute LLMHelper function and include results in chat context", async ({
+  test('should execute LLMHelper function and include results in chat context', async ({
     context,
     extensionId,
   }) => {
@@ -146,43 +146,43 @@ test.describe("Complete User Workflow", () => {
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
     // Verify sidepanel UI is ready
-    await expect(sidepanelPage.locator("h1")).toContainText("LLM Chat");
-    await expect(sidepanelPage.locator("#test-extract")).toBeVisible();
-    await expect(sidepanelPage.locator("#clear-btn")).toBeVisible();
+    await expect(sidepanelPage.locator('h1')).toContainText('LLM Chat');
+    await expect(sidepanelPage.locator('#test-extract')).toBeVisible();
+    await expect(sidepanelPage.locator('#clear-btn')).toBeVisible();
 
     // Step 2: Test clear chat button visibility and functionality
-    const clearBtn = sidepanelPage.locator("#clear-btn");
+    const clearBtn = sidepanelPage.locator('#clear-btn');
     await expect(clearBtn).toBeVisible();
-    await expect(clearBtn).toHaveAttribute("title", "Clear Chat");
+    await expect(clearBtn).toHaveAttribute('title', 'Clear Chat');
 
     // Initially should show welcome message
-    const welcomeMessage = sidepanelPage.locator(".welcome-message").first();
+    const welcomeMessage = sidepanelPage.locator('.welcome-message').first();
     await expect(welcomeMessage).toBeVisible();
-    await expect(welcomeMessage).toContainText("Welcome to LLM Chat!");
+    await expect(welcomeMessage).toContainText('Welcome to LLM Chat!');
 
     // Step 3: Test that Test Extract button is present and clickable
-    const testExtractBtn = sidepanelPage.locator("#test-extract");
+    const testExtractBtn = sidepanelPage.locator('#test-extract');
     await expect(testExtractBtn).toBeVisible();
     await expect(testExtractBtn).toBeEnabled();
-    await expect(testExtractBtn).toContainText("Test Extract");
+    await expect(testExtractBtn).toContainText('Test Extract');
 
     // Step 4: Test message input functionality
-    const messageInput = sidepanelPage.locator("#message-input");
-    const sendBtn = sidepanelPage.locator("#send-btn");
+    const messageInput = sidepanelPage.locator('#message-input');
+    const sendBtn = sidepanelPage.locator('#send-btn');
 
     await expect(messageInput).toBeVisible();
     await expect(sendBtn).toBeVisible();
 
     // Test that we can type in the input
-    await messageInput.fill("What did you extract from the page?");
-    await expect(messageInput).toHaveValue("What did you extract from the page?");
+    await messageInput.fill('What did you extract from the page?');
+    await expect(messageInput).toHaveValue('What did you extract from the page?');
 
     // Step 5: Test clear functionality (should actually clear conversation)
     await clearBtn.click();
     await sidepanelPage.waitForTimeout(1000); // Give time for async operation
 
     // Welcome message should be visible after clearing
-    await expect(sidepanelPage.locator(".welcome-message")).toBeVisible();
+    await expect(sidepanelPage.locator('.welcome-message')).toBeVisible();
 
     // Input should still be functional
     await expect(messageInput).toBeVisible();
@@ -191,12 +191,12 @@ test.describe("Complete User Workflow", () => {
     // Note: Status message indicating chat was cleared may appear briefly
 
     // Step 6: Verify all test buttons are present for LLMHelper functions
-    await expect(sidepanelPage.locator("#test-summary")).toBeVisible();
-    await expect(sidepanelPage.locator("#test-extract")).toBeVisible();
-    await expect(sidepanelPage.locator("#test-find")).toBeVisible();
+    await expect(sidepanelPage.locator('#test-summary')).toBeVisible();
+    await expect(sidepanelPage.locator('#test-extract')).toBeVisible();
+    await expect(sidepanelPage.locator('#test-find')).toBeVisible();
   });
 
-  test("should maintain stable chat UI without flicker during operations", async ({
+  test('should maintain stable chat UI without flicker during operations', async ({
     context,
     extensionId,
   }) => {
@@ -205,30 +205,30 @@ test.describe("Complete User Workflow", () => {
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
     // Verify initial state
-    await expect(sidepanelPage.locator(".welcome-message").first()).toBeVisible();
+    await expect(sidepanelPage.locator('.welcome-message').first()).toBeVisible();
 
     // Type a message but don't send it
-    const messageInput = sidepanelPage.locator("#message-input");
-    await messageInput.fill("Test message");
+    const messageInput = sidepanelPage.locator('#message-input');
+    await messageInput.fill('Test message');
 
     // Clear chat should not affect the input field content
-    const clearBtn = sidepanelPage.locator("#clear-btn");
+    const clearBtn = sidepanelPage.locator('#clear-btn');
     await clearBtn.click();
     await sidepanelPage.waitForTimeout(500);
 
     // Welcome message should still be there
-    await expect(sidepanelPage.locator(".welcome-message").first()).toBeVisible();
+    await expect(sidepanelPage.locator('.welcome-message').first()).toBeVisible();
 
     // Input field should maintain its content and be functional
-    await expect(messageInput).toHaveValue("Test message");
+    await expect(messageInput).toHaveValue('Test message');
     await expect(messageInput).toBeEditable();
 
     // Clear input and verify it works
     await messageInput.clear();
-    await expect(messageInput).toHaveValue("");
+    await expect(messageInput).toHaveValue('');
 
     // Type again to ensure input is responsive
-    await messageInput.fill("Another test");
-    await expect(messageInput).toHaveValue("Another test");
+    await messageInput.fill('Another test');
+    await expect(messageInput).toHaveValue('Another test');
   });
 });

@@ -1,16 +1,16 @@
-import { expect, test } from "./fixtures";
-import "./types";
+import { expect, test } from './fixtures';
+import './types';
 
-test.describe("Tool Functionality", () => {
+test.describe('Tool Functionality', () => {
   test.beforeEach(async ({ context }) => {
     // Ensure extension is loaded before each test
     const serviceWorkers = context.serviceWorkers();
     if (serviceWorkers.length === 0) {
-      await context.waitForEvent("serviceworker");
+      await context.waitForEvent('serviceworker');
     }
   });
 
-  test("should configure tools in options page", async ({ context, extensionId }) => {
+  test('should configure tools in options page', async ({ context, extensionId }) => {
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
 
@@ -19,14 +19,14 @@ test.describe("Tool Functionality", () => {
     await expect(toolsSection).toBeVisible();
 
     // Configure LM Studio settings first (required for auto-save)
-    const endpointInput = optionsPage.locator("#endpoint-input");
-    await endpointInput.fill("http://localhost:1234/v1/chat/completions");
+    const endpointInput = optionsPage.locator('#endpoint-input');
+    await endpointInput.fill('http://localhost:1234/v1/chat/completions');
 
-    const modelInput = optionsPage.locator("#model-input");
-    await modelInput.fill("test-model");
+    const modelInput = optionsPage.locator('#model-input');
+    await modelInput.fill('test-model');
 
     // Now test tools enabled checkbox (after required fields are filled)
-    const toolsEnabledCheckbox = optionsPage.locator("#tools-enabled");
+    const toolsEnabledCheckbox = optionsPage.locator('#tools-enabled');
     await expect(toolsEnabledCheckbox).toBeVisible();
     await expect(toolsEnabledCheckbox).toBeEnabled();
 
@@ -51,22 +51,22 @@ test.describe("Tool Functionality", () => {
     await optionsPage.waitForTimeout(1000);
   });
 
-  test("should display tool functionality in welcome message", async ({ context, extensionId }) => {
+  test('should display tool functionality in welcome message', async ({ context, extensionId }) => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
-    const welcomeMessage = sidepanelPage.locator(".welcome-message");
+    const welcomeMessage = sidepanelPage.locator('.welcome-message');
     await expect(welcomeMessage).toBeVisible();
 
     // Check that tool information is displayed
-    await expect(welcomeMessage).toContainText("autonomously use browser automation tools");
-    await expect(welcomeMessage).toContainText("Available Tools");
-    await expect(welcomeMessage).toContainText("find elements");
-    await expect(welcomeMessage).toContainText("extract text");
-    await expect(welcomeMessage).toContainText("get page summary");
+    await expect(welcomeMessage).toContainText('autonomously use browser automation tools');
+    await expect(welcomeMessage).toContainText('Available Tools');
+    await expect(welcomeMessage).toContainText('find elements');
+    await expect(welcomeMessage).toContainText('extract text');
+    await expect(welcomeMessage).toContainText('get page summary');
   });
 
-  test("should handle background script tool execution", async ({ context, extensionId }) => {
+  test('should handle background script tool execution', async ({ context, extensionId }) => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
@@ -75,10 +75,10 @@ test.describe("Tool Functionality", () => {
       return new Promise((resolve) => {
         (globalThis as any).chrome.runtime.sendMessage(
           {
-            type: "EXECUTE_FUNCTION",
+            type: 'EXECUTE_FUNCTION',
             payload: {
-              function: "find",
-              arguments: { pattern: "LLM" },
+              function: 'find',
+              arguments: { pattern: 'LLM' },
             },
           },
           (response: any) => {
@@ -87,16 +87,16 @@ test.describe("Tool Functionality", () => {
         );
 
         // Timeout fallback
-        setTimeout(() => resolve({ success: false, error: "timeout" }), 3000);
+        setTimeout(() => resolve({ success: false, error: 'timeout' }), 3000);
       });
     });
 
     // Background script should handle the message format
-    expect(findResult).toHaveProperty("type");
+    expect(findResult).toHaveProperty('type');
     expect((findResult as any).type).toMatch(/FUNCTION_RESPONSE|ERROR/);
   });
 
-  test("should validate tool message format", async ({ context, extensionId }) => {
+  test('should validate tool message format', async ({ context, extensionId }) => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
@@ -105,9 +105,9 @@ test.describe("Tool Functionality", () => {
       return new Promise((resolve) => {
         (globalThis as any).chrome.runtime.sendMessage(
           {
-            type: "EXECUTE_FUNCTION",
+            type: 'EXECUTE_FUNCTION',
             payload: {
-              function: "invalid_function",
+              function: 'invalid_function',
               arguments: {},
             },
           },
@@ -117,16 +117,16 @@ test.describe("Tool Functionality", () => {
         );
 
         // Timeout fallback
-        setTimeout(() => resolve({ success: false, error: "timeout" }), 3000);
+        setTimeout(() => resolve({ success: false, error: 'timeout' }), 3000);
       });
     });
 
     // Should handle invalid function gracefully
-    expect(validationTest).toHaveProperty("type");
+    expect(validationTest).toHaveProperty('type');
     expect((validationTest as any).type).toMatch(/FUNCTION_RESPONSE|ERROR/);
   });
 
-  test("should handle tool errors through background script", async ({ context, extensionId }) => {
+  test('should handle tool errors through background script', async ({ context, extensionId }) => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
@@ -135,10 +135,10 @@ test.describe("Tool Functionality", () => {
       return new Promise((resolve) => {
         (globalThis as any).chrome.runtime.sendMessage(
           {
-            type: "EXECUTE_FUNCTION",
+            type: 'EXECUTE_FUNCTION',
             payload: {
-              function: "describe",
-              arguments: { selector: "#non-existent-element" },
+              function: 'describe',
+              arguments: { selector: '#non-existent-element' },
             },
           },
           (response: any) => {
@@ -147,16 +147,16 @@ test.describe("Tool Functionality", () => {
         );
 
         // Timeout fallback
-        setTimeout(() => resolve({ success: false, error: "timeout" }), 3000);
+        setTimeout(() => resolve({ success: false, error: 'timeout' }), 3000);
       });
     });
 
     // Should handle gracefully
-    expect(errorTest).toHaveProperty("type");
+    expect(errorTest).toHaveProperty('type');
     expect((errorTest as any).type).toMatch(/FUNCTION_RESPONSE|ERROR/);
   });
 
-  test("should verify tool message types are handled", async ({ context, extensionId }) => {
+  test('should verify tool message types are handled', async ({ context, extensionId }) => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
@@ -165,9 +165,9 @@ test.describe("Tool Functionality", () => {
       return new Promise((resolve) => {
         (globalThis as any).chrome.runtime.sendMessage(
           {
-            type: "EXECUTE_FUNCTION",
+            type: 'EXECUTE_FUNCTION',
             payload: {
-              function: "summary",
+              function: 'summary',
               arguments: {},
             },
           },
@@ -177,16 +177,16 @@ test.describe("Tool Functionality", () => {
         );
 
         // Timeout fallback
-        setTimeout(() => resolve({ success: false, error: "timeout" }), 3000);
+        setTimeout(() => resolve({ success: false, error: 'timeout' }), 3000);
       });
     });
 
     // Background script should respond to the message
-    expect(messageResult).toHaveProperty("type");
+    expect(messageResult).toHaveProperty('type');
     expect((messageResult as any).type).toMatch(/FUNCTION_RESPONSE|ERROR/);
   });
 
-  test("should load tool schema generator correctly", async ({ context }) => {
+  test('should load tool schema generator correctly', async ({ context }) => {
     // Test that the tool schema generator produces valid tool definitions
     const serviceWorker = context.serviceWorkers()[0];
 
@@ -203,7 +203,7 @@ test.describe("Tool Functionality", () => {
           tools.length > 0 &&
           tools.every(
             (tool: any) =>
-              tool.type === "function" &&
+              tool.type === 'function' &&
               tool.function &&
               tool.function.name &&
               tool.function.description,
@@ -217,11 +217,11 @@ test.describe("Tool Functionality", () => {
     // For now, just check that service worker is running
     // We can't easily test the internal tool generation without more setup
     expect(serviceWorker).toBeDefined();
-    expect(serviceWorker.url()).toContain("background");
+    expect(serviceWorker.url()).toContain('background');
 
     // Verify tools are valid if we can test them
     if (toolsValid !== undefined) {
-      expect(typeof toolsValid).toBe("boolean");
+      expect(typeof toolsValid).toBe('boolean');
     }
   });
 });

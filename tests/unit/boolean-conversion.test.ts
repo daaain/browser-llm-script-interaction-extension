@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 
 // Import the function by creating a minimal version for testing
 // Since it's not exported, we'll test the behavior indirectly
@@ -7,11 +7,11 @@ function convertStringBooleans(obj: any): any {
     return obj;
   }
 
-  if (typeof obj === "string") {
+  if (typeof obj === 'string') {
     // Convert string "true"/"false" to boolean, case-insensitive
     const lowerStr = obj.toLowerCase();
-    if (lowerStr === "true") return true;
-    if (lowerStr === "false") return false;
+    if (lowerStr === 'true') return true;
+    if (lowerStr === 'false') return false;
     return obj;
   }
 
@@ -19,7 +19,7 @@ function convertStringBooleans(obj: any): any {
     return obj.map(convertStringBooleans);
   }
 
-  if (typeof obj === "object") {
+  if (typeof obj === 'object') {
     const converted: any = {};
     for (const [key, value] of Object.entries(obj)) {
       converted[key] = convertStringBooleans(value);
@@ -30,32 +30,32 @@ function convertStringBooleans(obj: any): any {
   return obj;
 }
 
-describe("Boolean conversion utility", () => {
+describe('Boolean conversion utility', () => {
   it('should convert string "true" to boolean true', () => {
-    expect(convertStringBooleans("true")).toBe(true);
-    expect(convertStringBooleans("True")).toBe(true);
-    expect(convertStringBooleans("TRUE")).toBe(true);
+    expect(convertStringBooleans('true')).toBe(true);
+    expect(convertStringBooleans('True')).toBe(true);
+    expect(convertStringBooleans('TRUE')).toBe(true);
   });
 
   it('should convert string "false" to boolean false', () => {
-    expect(convertStringBooleans("false")).toBe(false);
-    expect(convertStringBooleans("False")).toBe(false);
-    expect(convertStringBooleans("FALSE")).toBe(false);
+    expect(convertStringBooleans('false')).toBe(false);
+    expect(convertStringBooleans('False')).toBe(false);
+    expect(convertStringBooleans('FALSE')).toBe(false);
   });
 
-  it("should leave other strings unchanged", () => {
-    expect(convertStringBooleans("hello")).toBe("hello");
-    expect(convertStringBooleans("123")).toBe("123");
-    expect(convertStringBooleans("")).toBe("");
+  it('should leave other strings unchanged', () => {
+    expect(convertStringBooleans('hello')).toBe('hello');
+    expect(convertStringBooleans('123')).toBe('123');
+    expect(convertStringBooleans('')).toBe('');
   });
 
-  it("should handle nested objects", () => {
+  it('should handle nested objects', () => {
     const input = {
-      flag: "true",
-      enabled: "False",
-      name: "test",
+      flag: 'true',
+      enabled: 'False',
+      name: 'test',
       nested: {
-        visible: "TRUE",
+        visible: 'TRUE',
         count: 42,
       },
     };
@@ -63,7 +63,7 @@ describe("Boolean conversion utility", () => {
     const expected = {
       flag: true,
       enabled: false,
-      name: "test",
+      name: 'test',
       nested: {
         visible: true,
         count: 42,
@@ -73,32 +73,32 @@ describe("Boolean conversion utility", () => {
     expect(convertStringBooleans(input)).toEqual(expected);
   });
 
-  it("should handle arrays", () => {
-    const input = ["true", "false", "hello", "TRUE"];
-    const expected = [true, false, "hello", true];
+  it('should handle arrays', () => {
+    const input = ['true', 'false', 'hello', 'TRUE'];
+    const expected = [true, false, 'hello', true];
     expect(convertStringBooleans(input)).toEqual(expected);
   });
 
-  it("should handle null and undefined", () => {
+  it('should handle null and undefined', () => {
     expect(convertStringBooleans(null)).toBe(null);
     expect(convertStringBooleans(undefined)).toBe(undefined);
   });
 
-  it("should handle primitive types correctly", () => {
+  it('should handle primitive types correctly', () => {
     expect(convertStringBooleans(42)).toBe(42);
     expect(convertStringBooleans(true)).toBe(true);
     expect(convertStringBooleans(false)).toBe(false);
   });
 
-  it("should handle realistic tool parameters", () => {
+  it('should handle realistic tool parameters', () => {
     // Simulate LLM sending string booleans in tool parameters
     const toolArgs = {
-      fullPage: "True",
+      fullPage: 'True',
       options: {
-        includeHidden: "false",
-        scrollIntoView: "TRUE",
+        includeHidden: 'false',
+        scrollIntoView: 'TRUE',
         limit: 10,
-        searchType: "auto",
+        searchType: 'auto',
       },
     };
 
@@ -108,7 +108,7 @@ describe("Boolean conversion utility", () => {
         includeHidden: false,
         scrollIntoView: true,
         limit: 10,
-        searchType: "auto",
+        searchType: 'auto',
       },
     };
 
