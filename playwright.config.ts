@@ -16,7 +16,7 @@ export default defineConfig({
       name: 'chrome-extension',
       testMatch: '*.spec.ts',
       use: {
-        ...devices["Desktop Chrome"],
+        browserName: 'chromium',
       },
     },
   ],

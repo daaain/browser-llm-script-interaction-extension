@@ -1,5 +1,7 @@
 # Browser LLM Chat Extension
 
+Fair warning: this is currently an early prototype and it's not published as a properly built extension yet, but I'm sharing this early build as it's already working as a proof-of-concept when running in development. Chrome only for now.
+
 A cross-browser extension that provides a simple chat interface for interacting with LLM APIs, including local models via LM Studio.
 
 ## Features

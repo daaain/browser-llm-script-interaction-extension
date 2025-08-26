@@ -26,7 +26,7 @@ export default defineContentScript({
                 result = LLMHelper.find(args.pattern, args.options);
                 break;
               case 'click':
-                result = LLMHelper.click(args.selector);
+                result = LLMHelper.click(args.selector, args.text);
                 break;
               case 'type':
                 result = LLMHelper.type(args.selector, args.text, args.options);
@@ -50,6 +50,19 @@ export default defineContentScript({
                     sendResponse({
                       success: false,
                       error: error instanceof Error ? error.message : 'Screenshot failed',
+                    });
+                  });
+                return true; // Keep message channel open for async response
+              case 'getResponsePage':
+                // Handle getResponsePage asynchronously
+                LLMHelper.getResponsePage(args.responseId, args.page)
+                  .then((result: any) => {
+                    sendResponse({ success: true, result: result.result, _meta: result._meta });
+                  })
+                  .catch((error: unknown) => {
+                    sendResponse({
+                      success: false,
+                      error: error instanceof Error ? error.message : 'Get response page failed',
                     });
                   });
                 return true; // Keep message channel open for async response

@@ -15,6 +15,7 @@ export const test = base.extend<{
     const pathToExtension = path.join(__dirname, '../../.output/chrome-mv3');
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
+      devtools: true,
       args: [
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,

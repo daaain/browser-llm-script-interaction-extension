@@ -9,6 +9,7 @@ import type {
 } from '~/utils/types';
 import { sidepanelLogger } from '~/utils/debug-logger';
 import { MemoizedMarkdown } from './MemoizedMarkdown';
+import ManualToolInterface from './ManualToolInterface';
 
 /**
  * React-based Chat Interface with AI SDK Integration
@@ -268,7 +269,9 @@ const ChatInterface: React.FC = () => {
       if (response.type === 'FUNCTION_RESPONSE') {
         const result = response.payload;
         if (result.success) {
-          setStatus({ text: `${functionName} completed successfully` });
+          setStatus({
+            text: `${functionName} completed successfully! Results:\n${JSON.stringify(response.payload)}`,
+          });
         } else {
           setStatus({ text: `${functionName} failed: ${result.error}`, type: 'error' });
         }
@@ -351,23 +354,64 @@ const ChatInterface: React.FC = () => {
         <em>Executing...</em>
       </div>
     );
-    
+
     const renderResult = () => {
-      if (part.output?.type === 'screenshot' && part.output.dataUrl) {
+      // Handle screenshot output - check for dataUrl in various possible locations
+      const hasScreenshotData =
+        part.output?.dataUrl ||
+        (part.output?.type === 'screenshot' && part.output.dataUrl) ||
+        (part.toolName === 'screenshot' && part.output?.dataUrl);
+
+      if (hasScreenshotData) {
+        const imageUrl = part.output?.dataUrl || part.output.dataUrl;
         return (
           <div className="tool-result">
             <strong>🔧 Tool Result:</strong>
             <div className="screenshot-container">
-              <img src={part.output.dataUrl} className="screenshot-thumbnail" style={{ cursor: 'pointer' }} />
+              <img
+                src={imageUrl}
+                className="screenshot-thumbnail"
+                style={{
+                  cursor: 'pointer',
+                  maxWidth: '300px',
+                  maxHeight: '200px',
+                  border: '1px solid #ccc',
+                }}
+                alt="Screenshot"
+                onClick={() => {
+                  // Open in new tab for full view
+                  const newWindow = window.open();
+                  if (newWindow) {
+                    newWindow.document.body.innerHTML = `<img src="${imageUrl}" style="max-width:100%; max-height:100%;" alt="Screenshot"/>`;
+                  }
+                }}
+              />
             </div>
           </div>
         );
       } else {
+        // Check if result is a JSON string that should be parsed and merged
+        let displayOutput = part.output;
+        if (part.output && typeof part.output.result === 'string') {
+          try {
+            const parsedResult = JSON.parse(part.output.result);
+            // If it's an object, merge it into the output
+            if (typeof parsedResult === 'object' && parsedResult !== null) {
+              displayOutput = { ...part.output, ...parsedResult };
+              // Remove the original string result to avoid duplication
+              delete displayOutput.result;
+            }
+          } catch (e) {
+            // Not JSON, keep original output
+            displayOutput = part.output;
+          }
+        }
+
         return (
           <div className="tool-result">
             <strong>🔧 Tool Result:</strong>
             <pre>
-              <code>{JSON.stringify(part.output, null, 2)}</code>
+              <code>{JSON.stringify(displayOutput, null, 2)}</code>
             </pre>
           </div>
         );
