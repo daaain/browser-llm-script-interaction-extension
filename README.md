@@ -1,8 +1,12 @@
 # Browser LLM Chat Extension
 
-Fair warning: this is currently an early prototype and it's not published as a properly built extension yet, but I'm sharing this early build as it's already working as a proof-of-concept when running in development. Chrome only for now.
+**Fair warning: this is currently an early prototype and it's not published as a properly built extension yet, but I'm sharing this early build as it's already working as a proof-of-concept when running in development. Chrome only for now.**
 
-A cross-browser extension that provides a simple chat interface for interacting with LLM APIs, including local models via LM Studio.
+A cross-browser extension that provides a simple chat interface for LLMs (including local models) to interact with web pages.
+
+Real-time demo using qwen/qwen3-coder-30b MLX 6bit running on an M2 Max MBP:
+
+https://github.com/user-attachments/assets/7a584180-e8dd-4c7f-838a-efd051fa2968
 
 ## Features
 
