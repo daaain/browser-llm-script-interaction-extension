@@ -10,17 +10,17 @@ https://github.com/user-attachments/assets/7a584180-e8dd-4c7f-838a-efd051fa2968
 
 ## Features
 
-- 🌐 Cross-browser support (Chrome & Firefox)  
+- 🌐 Cross-browser support (Chrome & Firefox (soon))  
 - 💬 Simple chat interface via sidepanel
 - ⚙️ Configurable LLM providers (OpenAI, LM Studio, Custom)
 - 💾 Persistent chat history
-- 🔒 Secure API key storage
+- 🛠️ Javascript tools returning minimal responses to keep context small
 
 ## Quick Start
 
 Ready-to-use extension builds are available in the releases section. For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
-If you want to see a quick demo, go to Google.com and type `click reject all and search for "fluffy robots"`
+If you want to see a quick demo, go to Google.com and type `click Reject All, search fluffy robots, and tell me which 3 are the most popular`
 
 ## Installation
 

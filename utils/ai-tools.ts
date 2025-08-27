@@ -395,9 +395,21 @@ export const clickTool = tool({
       result.result.action === 'click' &&
       result.result.elements
     ) {
+      const elements = result.result.elements;
+      const searchText = result.result.searchText;
+      
+      // Create helpful guidance for each element
+      const elementInstructions = elements.map((el: any, index: number) => {
+        const elementType = el.tag;
+        const elementText = el.text ? `"${el.text}"` : 'no text';
+        const classes = el.classes ? ` with classes "${el.classes}"` : '';
+        
+        return `${index + 1}. ${elementType} element (${elementText})${classes}\n   Use: click(selector: "${el.selector}")`;
+      }).join('\n');
+      
       return {
         success: true,
-        result: `Multiple elements found containing text "${result.result.searchText}". Please choose one and call click() again by using its selector:`,
+        result: `Multiple elements found containing "${searchText}". Please choose one:\n\n${elementInstructions}`,
         elements: result.result.elements,
         total: result.result.total,
       };

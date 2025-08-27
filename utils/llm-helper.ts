@@ -130,6 +130,74 @@ export function createLLMHelper(): LLMHelperInterface {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   }
 
+  // Helper function to score elements based on where the pattern matches
+  function scoreElement(element: Element, pattern: RegExp): number {
+    let score = 0;
+    
+    // Highest priority: matches in visible text content
+    const textContent = getElementText(element);
+    if (pattern.test(textContent)) {
+      score += 100;
+    }
+    
+    // High priority: matches in form values or placeholders
+    if (element instanceof HTMLInputElement) {
+      if (pattern.test(element.value || '')) score += 90;
+      if (pattern.test(element.placeholder || '')) score += 80;
+    }
+    
+    // Medium priority: matches in accessibility attributes
+    const ariaLabel = element.getAttribute('aria-label') || '';
+    const title = element.getAttribute('title') || '';
+    const alt = element.getAttribute('alt') || '';
+    
+    if (pattern.test(ariaLabel)) score += 70;
+    if (pattern.test(title)) score += 60;
+    if (pattern.test(alt)) score += 60;
+    
+    // Lower priority: matches elsewhere in outerHTML
+    if (score === 0 && pattern.test(element.outerHTML)) {
+      score += 10;
+    }
+    
+    // Bonus for interactive elements
+    if (element.tagName.toLowerCase() === 'button' || 
+        element.tagName.toLowerCase() === 'a' ||
+        element.getAttribute('role') === 'button') {
+      score += 5;
+    }
+    
+    return score;
+  }
+  
+  // Helper function to remove duplicate nested elements
+  function deduplicateElements(elements: Element[]): Element[] {
+    const result: Element[] = [];
+    
+    for (const element of elements) {
+      let shouldInclude = true;
+      
+      // Check if this element is contained within any element already in results
+      for (const existing of result) {
+        if (existing.contains(element)) {
+          shouldInclude = false;
+          break;
+        }
+        // If current element contains an existing element, remove the existing one
+        if (element.contains(existing)) {
+          const index = result.indexOf(existing);
+          result.splice(index, 1);
+        }
+      }
+      
+      if (shouldInclude) {
+        result.push(element);
+      }
+    }
+    
+    return result;
+  }
+
   // Note: Response truncation is now handled globally by the response manager
 
   // Helper function to get text content from element
@@ -216,12 +284,21 @@ export function createLLMHelper(): LLMHelperInterface {
         const candidates = document.querySelectorAll(selectorQuery);
         debugLog(`Found ${candidates.length} candidate elements for selector: ${selectorQuery}`);
 
-        const matchingElements = Array.from(candidates).filter((el) => {
-          const htmlContent = el.outerHTML;
-          const matchesPattern = regex.test(htmlContent);
-          const isVisibleElement = !options.visible || isVisible(el);
-          return matchesPattern && isVisibleElement;
-        });
+        // Score and filter elements
+        const scoredElements = Array.from(candidates)
+          .map((el) => ({
+            element: el,
+            score: scoreElement(el, regex)
+          }))
+          .filter(({ score, element }) => {
+            const isVisibleElement = !options.visible || isVisible(element);
+            return score > 0 && isVisibleElement;
+          })
+          .sort((a, b) => b.score - a.score); // Sort by score descending
+        
+        // Deduplicate nested elements and get final list
+        const preliminaryElements = scoredElements.map(({ element }) => element);
+        const matchingElements = deduplicateElements(preliminaryElements);
 
         const total = matchingElements.length;
         const limit = options.limit || 10;
