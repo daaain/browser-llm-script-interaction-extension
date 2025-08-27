@@ -67,7 +67,7 @@ function extractZodSchemaInfo(
       baseParam.enumValues = schema._def.values;
       break;
 
-    case 'ZodObject':
+    case 'ZodObject': {
       baseParam.type = 'object';
       baseParam.properties = [];
 
@@ -78,6 +78,7 @@ function extractZodSchemaInfo(
         baseParam.properties.push(extractZodSchemaInfo(value as any, key, isRequired));
       }
       break;
+    }
 
     default:
       // Fallback to string for unknown types
@@ -108,9 +109,7 @@ export function extractToolsMetadata(): ToolMetadata[] {
         const shape = inputSchema._def.shape();
 
         for (const [paramName, paramSchema] of Object.entries(shape)) {
-          const isRequired =
-            !inputSchema._def.unknownKeys &&
-            !((paramSchema as any)._def?.typeName === 'ZodOptional');
+          const isRequired = !((paramSchema as any)._def?.typeName === 'ZodOptional');
 
           metadata.parameters.push(extractZodSchemaInfo(paramSchema as any, paramName, isRequired));
         }

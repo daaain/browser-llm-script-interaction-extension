@@ -19,6 +19,10 @@ test.describe('Manual Streaming Test', () => {
     extensionId,
     consoleLogs,
   }) => {
+    test.skip(
+      process.env.CI === 'true',
+      'This test requires manual LLM setup and is skipped in CI',
+    );
     // Create results directory if it doesn't exist
     if (!fs.existsSync('test-results')) {
       fs.mkdirSync('test-results');
@@ -97,15 +101,25 @@ test.describe('Manual Streaming Test', () => {
     await optionsPage.locator('#endpoint-input').fill('http://localhost:1234/v1/chat/completions');
     await optionsPage.locator('#model-input').fill('local-model');
 
-    // Enable tools - try multiple approaches
+    // Enable tools - use JavaScript evaluation for reliability
     try {
       const toolsCheckbox = optionsPage.locator('#tools-enabled');
+
+      // Use JavaScript evaluation to set checkbox state reliably
+      await optionsPage.evaluate(() => {
+        const checkbox = document.getElementById('tools-enabled') as HTMLInputElement;
+        if (checkbox && !checkbox.checked) {
+          checkbox.checked = true;
+          // Trigger change event to notify the form
+          checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
       const isChecked = await toolsCheckbox.isChecked();
-      if (!isChecked) {
-        await toolsCheckbox.click();
-        console.log('✅ Tools checkbox clicked');
-      } else {
+      if (isChecked) {
         console.log('✅ Tools checkbox already checked');
+      } else {
+        console.log('✅ Tools checkbox enabled via JavaScript');
       }
     } catch (e: any) {
       console.log('⚠️ Could not interact with tools checkbox:', e.message);

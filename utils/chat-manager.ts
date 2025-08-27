@@ -1,7 +1,7 @@
-import type { ChatMessage, LLMProvider } from '~/utils/types';
+import { backgroundLogger } from '~/utils/debug-logger';
 import { LLMService } from '~/utils/llm-service';
 import { settingsManager } from '~/utils/settings-manager';
-import { backgroundLogger } from '~/utils/debug-logger';
+import type { ChatMessage, LLMProvider } from '~/utils/types';
 
 /**
  * Chat Manager
@@ -70,7 +70,7 @@ export class ChatManager {
 
       // Create initial streaming message
       const streamingMessageId = `streaming-${Date.now()}`;
-      let streamingMessage: ChatMessage = {
+      const streamingMessage: ChatMessage = {
         id: streamingMessageId,
         role: 'assistant',
         content: '',

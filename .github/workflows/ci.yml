@@ -1,0 +1,44 @@
+# NOTE: you can run these jobs locally using act (https://github.com/nektos/act), e.g. act -j test
+
+name: Lint and test
+
+on:
+  push:
+    branches: # not tags
+      - "**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+        
+    - name: Install dependencies
+      run: pnpm install
+    
+    # TODO: fix first
+    # - name: Lint
+    #   run: pnpm lint
+      
+    - name: Type check
+      run: pnpm typecheck
+      
+    - name: Run unit tests
+      run: pnpm test:ci
+      
+    - name: Install Playwright browsers
+      run: pnpm exec playwright install --with-deps
+      
+    - name: Run E2E tests (skip LLM-dependent tests)
+      run: pnpm test:e2e

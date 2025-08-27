@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { defineBackground } from 'wxt/utils/define-background';
-import { messageHandler } from '~/utils/message-handler';
 import { backgroundLogger } from '~/utils/debug-logger';
+import { messageHandler } from '~/utils/message-handler';
 
 /**
  * Background Script

@@ -1,10 +1,10 @@
 import browser from 'webextension-polyfill';
-import type { MessageFromSidebar, MessageToSidebar, ExtensionSettings } from '~/utils/types';
-import { settingsManager } from '~/utils/settings-manager';
 import { chatManager } from '~/utils/chat-manager';
-import { createLLMService } from '~/utils/llm-service';
 import { backgroundLogger } from '~/utils/debug-logger';
+import { createLLMService } from '~/utils/llm-service';
 import { responseManager } from '~/utils/response-manager';
+import { settingsManager } from '~/utils/settings-manager';
+import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from '~/utils/types';
 
 /**
  * Message Handler

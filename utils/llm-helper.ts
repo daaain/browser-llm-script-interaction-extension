@@ -19,7 +19,10 @@ export interface LLMHelperInterface {
     total: number;
     hasMore: boolean;
   };
-  click(selector?: string, text?: string): string;
+  click(
+    selector?: string,
+    text?: string,
+  ): string | { elements: any[]; total: number; searchText: string; action: string };
   type(
     selector: string,
     text: string,
@@ -246,7 +249,10 @@ export function createLLMHelper(): LLMHelperInterface {
     },
 
     // Click on an element
-    click(selector?: string, text?: string): string {
+    click(
+      selector?: string,
+      text?: string,
+    ): string | { elements: any[]; total: number; searchText: string; action: string } {
       try {
         debugLog('click() called', { selector, text });
 
@@ -260,23 +266,26 @@ export function createLLMHelper(): LLMHelperInterface {
           }
         } else if (text) {
           // Use find() internally to search by text
-          const findResult = this.find(text, { 
+          const findResult = this.find(text, {
             limit: 5,
             type: '*',
-            visible: true 
+            visible: true,
           });
-          
+
           if (findResult.elements.length === 0) {
             return `No element found containing text: "${text}"`;
           }
-          
+
           if (findResult.elements.length > 1) {
-            const elementList = findResult.elements.map(el => 
-              `${el.tag}${el.classes ? '.' + el.classes.split(' ').slice(0,2).join('.') : ''} - "${el.text}"`
-            ).join(', ');
-            return `Multiple elements found containing text "${text}": ${elementList}. Please be more specific or use a selector.`;
+            // Return structured response similar to find() for LLM to choose from
+            return {
+              elements: findResult.elements,
+              total: findResult.total,
+              searchText: text!,
+              action: 'click',
+            };
           }
-          
+
           // Get the element using the selector from find result
           element = document.querySelector(findResult.elements[0].selector);
           if (!element) {
@@ -577,7 +586,7 @@ export function createLLMHelper(): LLMHelperInterface {
             payload: { responseId, page },
           };
 
-          const response = await browser.runtime.sendMessage(message) as any;
+          const response = (await browser.runtime.sendMessage(message)) as any;
 
           if (response && response.type === 'RESPONSE_PAGE' && response.payload?.success) {
             debugLog('getResponsePage() successful', {

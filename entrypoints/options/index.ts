@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
+import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
 import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from '~/utils/types';
 import { DEFAULT_PROVIDERS } from '~/utils/types';
-import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
 
 class SettingsManager {
   private currentSettings: ExtensionSettings | null = null;

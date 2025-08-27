@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import browser from 'webextension-polyfill';
+import { sidepanelLogger } from '~/utils/debug-logger';
 import type {
   ChatMessage,
   ExtensionSettings,
+  MessageContent,
   MessageFromSidebar,
   MessageToSidebar,
-  MessageContent,
 } from '~/utils/types';
-import { sidepanelLogger } from '~/utils/debug-logger';
-import { MemoizedMarkdown } from './MemoizedMarkdown';
 import ManualToolInterface from './ManualToolInterface';
+import { MemoizedMarkdown } from './MemoizedMarkdown';
 
 /**
  * React-based Chat Interface with AI SDK Integration
@@ -390,16 +391,23 @@ const ChatInterface: React.FC = () => {
           </div>
         );
       } else {
-        // Check if result is a JSON string that should be parsed and merged
+        // Handle tool result display with proper JSON formatting
         let displayOutput = part.output;
-        if (part.output && typeof part.output.result === 'string') {
+
+        // If result is already an object, keep it as-is
+        if (part.output && typeof part.output.result === 'object' && part.output.result !== null) {
+          displayOutput = part.output;
+        }
+        // If result is a JSON string, try to parse it
+        else if (part.output && typeof part.output.result === 'string') {
           try {
             const parsedResult = JSON.parse(part.output.result);
-            // If it's an object, merge it into the output
+            // If it's an object, replace the string with the parsed object
             if (typeof parsedResult === 'object' && parsedResult !== null) {
-              displayOutput = { ...part.output, ...parsedResult };
-              // Remove the original string result to avoid duplication
-              delete displayOutput.result;
+              displayOutput = {
+                ...part.output,
+                result: parsedResult,
+              };
             }
           } catch (e) {
             // Not JSON, keep original output

@@ -1,11 +1,10 @@
-import { streamText, convertToModelMessages, stepCountIs } from 'ai';
-
 // Import types for AI SDK integration
 import { openai } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type { LLMProvider } from './types';
+import { convertToModelMessages, stepCountIs, streamText } from 'ai';
 import { availableTools } from './ai-tools';
 import { backgroundLogger } from './debug-logger';
+import type { LLMProvider } from './types';
 
 /**
  * LLM Service
@@ -269,7 +268,7 @@ export class LLMService {
             onChunk(finalText);
             break;
 
-          case 'tool-call':
+          case 'tool-call': {
             backgroundLogger.debug('Tool call received', {
               toolName: part.toolName,
               input: part.input,
@@ -305,8 +304,9 @@ export class LLMService {
             };
             onChunk(toolCallUIMessage);
             break;
+          }
 
-          case 'tool-result':
+          case 'tool-result': {
             backgroundLogger.debug('Tool result received', {
               toolCallId: part.toolCallId,
               output: part.output,
@@ -362,6 +362,7 @@ export class LLMService {
             };
             onChunk(toolResultUIMessage);
             break;
+          }
 
           case 'error':
             backgroundLogger.error('Stream error', { error: part });

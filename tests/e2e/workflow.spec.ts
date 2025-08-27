@@ -137,7 +137,7 @@ test.describe('Complete User Workflow', () => {
     expect(newValidity).toBe(true);
   });
 
-  test('should execute LLMHelper function and include results in chat context', async ({
+  test('should have manual tool testing interface with tool selection and execution', async ({
     context,
     extensionId,
   }) => {
@@ -147,7 +147,6 @@ test.describe('Complete User Workflow', () => {
 
     // Verify sidepanel UI is ready
     await expect(sidepanelPage.locator('h1')).toContainText('LLM Chat');
-    await expect(sidepanelPage.locator('#test-extract')).toBeVisible();
     await expect(sidepanelPage.locator('#clear-btn')).toBeVisible();
 
     // Step 2: Test clear chat button visibility and functionality
@@ -160,13 +159,31 @@ test.describe('Complete User Workflow', () => {
     await expect(welcomeMessage).toBeVisible();
     await expect(welcomeMessage).toContainText('Welcome to LLM Chat!');
 
-    // Step 3: Test that Test Extract button is present and clickable
-    const testExtractBtn = sidepanelPage.locator('#test-extract');
-    await expect(testExtractBtn).toBeVisible();
-    await expect(testExtractBtn).toBeEnabled();
-    await expect(testExtractBtn).toContainText('Test Extract');
+    // Step 3: Test manual tool interface is present
+    await expect(sidepanelPage.locator('.manual-tool-interface')).toBeVisible();
+    await expect(sidepanelPage.locator('.tool-header h4')).toContainText('Manual Tool Testing');
 
-    // Step 4: Test message input functionality
+    // Step 4: Test tool selector is present and functional
+    const toolSelect = sidepanelPage.locator('#tool-select');
+    await expect(toolSelect).toBeVisible();
+
+    // Should have tools available (extract, find, etc.)
+    const toolOptions = await toolSelect.locator('option').allTextContents();
+    expect(toolOptions.length).toBeGreaterThan(1); // Should have multiple tools available
+
+    // Step 5: Test tool parameter form updates when selection changes
+    await toolSelect.selectOption({ index: 1 }); // Select second tool
+    await sidepanelPage.waitForTimeout(500); // Allow form to update
+
+    // Tool form should be visible
+    await expect(sidepanelPage.locator('.tool-form')).toBeVisible();
+
+    // Execute button should be present
+    const executeBtn = sidepanelPage.locator('.tool-execute-btn');
+    await expect(executeBtn).toBeVisible();
+    await expect(executeBtn).toBeEnabled();
+
+    // Step 6: Test message input functionality
     const messageInput = sidepanelPage.locator('#message-input');
     const sendBtn = sidepanelPage.locator('#send-btn');
 
@@ -174,10 +191,10 @@ test.describe('Complete User Workflow', () => {
     await expect(sendBtn).toBeVisible();
 
     // Test that we can type in the input
-    await messageInput.fill('What did you extract from the page?');
-    await expect(messageInput).toHaveValue('What did you extract from the page?');
+    await messageInput.fill('Can you help me with browser automation?');
+    await expect(messageInput).toHaveValue('Can you help me with browser automation?');
 
-    // Step 5: Test clear functionality (should actually clear conversation)
+    // Step 7: Test clear functionality (should actually clear conversation)
     await clearBtn.click();
     await sidepanelPage.waitForTimeout(1000); // Give time for async operation
 
@@ -188,12 +205,8 @@ test.describe('Complete User Workflow', () => {
     await expect(messageInput).toBeVisible();
     await expect(sendBtn).toBeVisible();
 
-    // Note: Status message indicating chat was cleared may appear briefly
-
-    // Step 6: Verify all test buttons are present for LLMHelper functions
-    await expect(sidepanelPage.locator('#test-summary')).toBeVisible();
-    await expect(sidepanelPage.locator('#test-extract')).toBeVisible();
-    await expect(sidepanelPage.locator('#test-find')).toBeVisible();
+    // Manual tool interface should still be present after clearing
+    await expect(sidepanelPage.locator('.manual-tool-interface')).toBeVisible();
   });
 
   test('should maintain stable chat UI without flicker during operations', async ({

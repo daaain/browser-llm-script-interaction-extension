@@ -137,7 +137,7 @@ test.describe('Options Page', () => {
     // Test model input
     const modelInput = page.locator('#model-input');
     await modelInput.fill('gpt-4');
-    expect(await modelInput.inputValue()).toBe('gpt-4');
+    await expect(modelInput).toHaveValue('gpt-4');
 
     // Test API key input (should be password type)
     const apiKeyInput = page.locator('#api-key-input');

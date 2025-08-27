@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
+import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
 import type { ExtensionSettings } from '~/utils/types';
 import { DEFAULT_PROVIDERS } from '~/utils/types';
-import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
 
 export class SettingsManager {
   private static instance: SettingsManager;

@@ -10,7 +10,7 @@ import { settingsManager } from '~/utils/settings-manager';
  */
 
 export interface TruncationResult {
-  content: string;
+  content: string | any;
   isTruncated: boolean;
   originalLength: number;
   truncatedLength: number;
@@ -78,25 +78,44 @@ class ResponseManagerClass {
     const responseId = this.generateResponseId();
     const pageSize = customPageSize || this.currentTruncationLimit;
 
-    // Convert content to string if it's an object
+    // Handle different content types
     let stringContent: string;
     let contentType: 'text' | 'json' | 'mixed' = 'text';
+    const originalContent = content;
 
     if (typeof content === 'string') {
       stringContent = content;
     } else {
       try {
-        stringContent = JSON.stringify(content, null, 2);
+        // Use dense JSON (no whitespace) to save tokens
+        stringContent = JSON.stringify(content);
         contentType = 'json';
       } catch {
         stringContent = String(content);
       }
     }
 
-    // Buffer the full response
+    // Check if content fits within page size
+    if (stringContent.length <= pageSize) {
+      // Content fits in one page - return original object if it's JSON, string otherwise
+      return {
+        content: contentType === 'json' ? originalContent : stringContent,
+        isTruncated: false,
+        originalLength: stringContent.length,
+        truncatedLength: stringContent.length,
+        currentPage: 1,
+        totalPages: 1,
+        hasMore: false,
+        hasPrevious: false,
+        pageSize,
+        responseId,
+      };
+    }
+
+    // Content needs truncation - buffer as string and paginate
     this.bufferResponse(responseId, stringContent, contentType, toolName, pageSize);
 
-    // Return first page
+    // Return first page (will be truncated string)
     return this.getPage(responseId, 1);
   }
 
@@ -175,9 +194,7 @@ class ResponseManagerClass {
           JSON.parse(candidate);
           validJson = candidate;
           break;
-        } catch {
-          continue;
-        }
+        } catch {}
       }
 
       if (validJson) {

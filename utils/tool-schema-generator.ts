@@ -1,5 +1,5 @@
-import type { LLMTool } from '~/utils/types';
 import type { LLMHelperInterface } from '~/utils/llm-helper';
+import type { LLMTool } from '~/utils/types';
 
 /**
  * Generates OpenAI-compatible tool definitions for LLMHelper methods

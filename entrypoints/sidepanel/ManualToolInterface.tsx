@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
 import {
   extractToolsMetadata,
-  validateToolArguments,
-  type ToolMetadata,
   type ParameterDefinition,
+  type ToolMetadata,
+  validateToolArguments,
 } from '~/utils/tool-metadata-extractor';
 
 interface ManualToolInterfaceProps {

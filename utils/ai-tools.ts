@@ -1,8 +1,8 @@
 import { tool } from 'ai';
-import { z } from 'zod/v3';
 import browser from 'webextension-polyfill';
-import type { ContentScriptFunctionRequest, ContentScriptFunctionResponse } from './types';
+import { z } from 'zod/v3';
 import { responseManager, type TruncationResult } from './response-manager';
+import type { ContentScriptFunctionRequest, ContentScriptFunctionResponse } from './types';
 
 /**
  * AI SDK Tool Definitions
@@ -385,7 +385,25 @@ export const clickTool = tool({
       },
     });
 
-    return result.success ? result : { error: result.error };
+    if (!result.success) {
+      return { error: result.error };
+    }
+
+    // Handle case where multiple elements were found
+    if (
+      typeof result.result === 'object' &&
+      result.result.action === 'click' &&
+      result.result.elements
+    ) {
+      return {
+        success: true,
+        result: `Multiple elements found containing text "${result.result.searchText}". Please choose one and call click() again by using its selector:`,
+        elements: result.result.elements,
+        total: result.result.total,
+      };
+    }
+
+    return result;
   },
 });
 
@@ -446,7 +464,7 @@ export const getResponsePageTool = tool({
     try {
       // Execute through content script function handler to ensure proper message routing
       const result = await executeContentScriptFunction('getResponsePage', { responseId, page });
-      
+
       if (!result.success) {
         return {
           success: false,

@@ -36,6 +36,7 @@ test.describe('Streaming Functionality', () => {
   });
 
   test('should stream text with real LLM API and tool calls', async ({ context, extensionId }) => {
+    test.skip(process.env.CI === 'true', 'This test requires LLM API access and is skipped in CI');
     // First configure the extension
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
@@ -60,14 +61,6 @@ test.describe('Streaming Functionality', () => {
     // Verify it's now checked
     const finalState = await toolsCheckbox.isChecked();
     console.log(`Tools checkbox final state: ${finalState}`);
-
-    // If still not enabled, try clicking
-    if (!finalState) {
-      await toolsCheckbox.click();
-      await optionsPage.waitForTimeout(500);
-      const afterClick = await toolsCheckbox.isChecked();
-      console.log(`Tools checkbox after click: ${afterClick}`);
-    }
     await optionsPage.waitForTimeout(2000); // Wait for auto-save
 
     // Set up test page for tools to interact with - use a real website since content scripts don't run on extension pages
@@ -197,6 +190,7 @@ test.describe('Streaming Functionality', () => {
   });
 
   test('should stream simple text without tool calls', async ({ context, extensionId }) => {
+    test.skip(process.env.CI === 'true', 'This test requires LLM API access and is skipped in CI');
     // Configure the extension first
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);

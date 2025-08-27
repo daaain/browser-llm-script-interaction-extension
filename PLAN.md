@@ -4,6 +4,7 @@ Roadmap / TODO:
 
 - recursive LLM scripting: have an LLM generate saveable scripts that can also call an LLM, so incorporating the alt text generator as an example would be perfect
 - see chat history
+- share / export individual chats
 - save complex function call sequence into action scripts
 - system prompt with and without tools
 - tutorial / welcome screen

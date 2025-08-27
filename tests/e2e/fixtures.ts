@@ -1,6 +1,12 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type BrowserContext, test as base, chromium } from '@playwright/test';
+import {
+  type BrowserContext,
+  test as base,
+  chromium,
+  expect as expectBase,
+} from '@playwright/test';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,14 +48,21 @@ export const test = base.extend<{
   consoleLogs: async ({ context }, use) => {
     const logs: string[] = [];
 
+    // Create test-results directory for log files
+    if (!fs.existsSync('test-results')) {
+      fs.mkdirSync('test-results');
+    }
+
     // Listen for console events on all pages
     context.on('page', (page) => {
       page.on('console', (msg) => {
         const timestamp = new Date().toISOString();
         const logEntry = `[${timestamp}] ${msg.type()}: ${msg.text()}`;
         logs.push(logEntry);
-        // Also output to test console for real-time debugging
-        console.log(`📱 Extension Console: ${logEntry}`);
+        // Only log errors and warnings to console, save everything to file
+        if (msg.type() === 'error' || msg.type() === 'warning') {
+          console.log(`📱 Extension Console: ${logEntry}`);
+        }
       });
     });
 
@@ -59,11 +72,20 @@ export const test = base.extend<{
         const timestamp = new Date().toISOString();
         const logEntry = `[${timestamp}] ${msg.type()}: ${msg.text()}`;
         logs.push(logEntry);
-        console.log(`📱 Extension Console: ${logEntry}`);
+        // Only log errors and warnings to console, save everything to file
+        if (msg.type() === 'error' || msg.type() === 'warning') {
+          console.log(`📱 Extension Console: ${logEntry}`);
+        }
       });
     }
 
     await use(logs);
+
+    // Save all logs to file at the end
+    const testName = (expectBase.getState() as any)?.currentTestName || 'unknown-test';
+    const logFileName = `test-results/console-logs-${testName.replace(/[^a-zA-Z0-9]/g, '-')}.log`;
+    fs.writeFileSync(logFileName, logs.join('\n'));
+    console.log(`Verbose logs saved in: ${logFileName}`);
   },
 });
 
