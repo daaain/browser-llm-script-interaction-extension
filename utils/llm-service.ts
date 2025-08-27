@@ -2,7 +2,7 @@
 import { openai } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { convertToModelMessages, stepCountIs, streamText } from 'ai';
-import { availableTools } from './ai-tools';
+import { availableTools, getToolsForSettings } from './ai-tools';
 import { backgroundLogger } from './debug-logger';
 import type { LLMProvider } from './types';
 
@@ -135,13 +135,18 @@ export class LLMService {
     onComplete: (fullText: string, toolCalls?: any[], toolResults?: any[], uiMessage?: any) => void,
     onError: (error: string) => void,
     enableTools: boolean = false,
+    toolSettings?: { toolsEnabled: boolean; screenshotToolEnabled: boolean },
   ): Promise<void> {
     try {
+      // Get tools based on settings
+      const toolsToUse = toolSettings ? getToolsForSettings(toolSettings) : availableTools;
+      
       backgroundLogger.info('LLM Service streamMessage called', {
         enableTools,
         messageCount: messages?.length,
-        availableToolsCount: Object.keys(availableTools).length,
-        toolNames: Object.keys(availableTools),
+        availableToolsCount: Object.keys(toolsToUse).length,
+        toolNames: Object.keys(toolsToUse),
+        toolSettings,
       });
       if (!enableTools) {
         // Simple streaming without tools
@@ -247,7 +252,7 @@ export class LLMService {
       const result = streamText({
         model: this.model,
         messages: modelMessages,
-        tools: availableTools,
+        tools: toolsToUse,
         temperature: 0.1,
         stopWhen: stepCountIs(50),
       });

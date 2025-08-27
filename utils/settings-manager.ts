@@ -43,6 +43,12 @@ export class SettingsManager {
           console.debug('Added missing toolsEnabled to existing settings');
         }
 
+        if (typeof settings.screenshotToolEnabled === 'undefined') {
+          settings.screenshotToolEnabled = false;
+          needsUpdate = true;
+          console.debug('Added missing screenshotToolEnabled to existing settings');
+        }
+
         if (needsUpdate) {
           await browser.storage.local.set({ settings });
         }
@@ -60,6 +66,7 @@ export class SettingsManager {
         debugMode: true,
         truncationLimit: DEFAULT_TRUNCATION_LIMIT,
         toolsEnabled: true,
+        screenshotToolEnabled: false,
       };
 
       await browser.storage.local.set({ settings: defaultSettings });

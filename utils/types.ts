@@ -133,6 +133,7 @@ export interface ExtensionSettings {
   truncationLimit: number;
   tabConversations?: { [tabId: string]: ChatMessage[] };
   toolsEnabled: boolean;
+  screenshotToolEnabled: boolean;
 }
 
 export const DEFAULT_PROVIDERS: Omit<LLMProvider, 'apiKey'>[] = [

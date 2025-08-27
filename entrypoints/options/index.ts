@@ -73,6 +73,8 @@ class SettingsManager {
       this.currentSettings.debugMode || false;
     (document.getElementById('tools-enabled') as HTMLInputElement).checked =
       this.currentSettings.toolsEnabled || false;
+    (document.getElementById('screenshot-tool-enabled') as HTMLInputElement).checked =
+      this.currentSettings.screenshotToolEnabled || false;
     (document.getElementById('truncation-limit-input') as HTMLInputElement).value =
       this.currentSettings.truncationLimit?.toString() || DEFAULT_TRUNCATION_LIMIT.toString();
   }
@@ -107,8 +109,10 @@ class SettingsManager {
     // Auto-save for checkboxes
     const debugModeCheckbox = document.getElementById('debug-mode') as HTMLInputElement;
     const toolsEnabledCheckbox = document.getElementById('tools-enabled') as HTMLInputElement;
+    const screenshotToolEnabledCheckbox = document.getElementById('screenshot-tool-enabled') as HTMLInputElement;
     debugModeCheckbox.addEventListener('change', () => this.autoSave());
     toolsEnabledCheckbox.addEventListener('change', () => this.autoSave());
+    screenshotToolEnabledCheckbox.addEventListener('change', () => this.autoSave());
 
     testButton.addEventListener('click', () => this.testConnection());
     clearHistoryButton.addEventListener('click', () => this.clearHistory());
@@ -133,6 +137,7 @@ class SettingsManager {
       const apiKey = (document.getElementById('api-key-input') as HTMLInputElement).value;
       const debugMode = (document.getElementById('debug-mode') as HTMLInputElement).checked;
       const toolsEnabled = (document.getElementById('tools-enabled') as HTMLInputElement).checked;
+      const screenshotToolEnabled = (document.getElementById('screenshot-tool-enabled') as HTMLInputElement).checked;
       const truncationLimit =
         parseInt(
           (document.getElementById('truncation-limit-input') as HTMLInputElement).value,
@@ -154,6 +159,7 @@ class SettingsManager {
         },
         debugMode,
         toolsEnabled,
+        screenshotToolEnabled,
         truncationLimit,
       };
 

@@ -193,6 +193,10 @@ export class ChatManager {
         onComplete,
         onError,
         settings.toolsEnabled,
+        {
+          toolsEnabled: settings.toolsEnabled,
+          screenshotToolEnabled: settings.screenshotToolEnabled,
+        },
       );
       backgroundLogger.info('llmService.streamMessage completed');
 

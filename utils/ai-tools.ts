@@ -542,6 +542,22 @@ export function getConfiguredTools(
 }
 
 /**
+ * Get tools based on extension settings
+ * Uses the extension configuration to determine which tools to enable
+ */
+export function getToolsForSettings(settings: { toolsEnabled: boolean; screenshotToolEnabled: boolean }): Record<string, any> {
+  if (!settings.toolsEnabled) {
+    return {};
+  }
+
+  return getConfiguredTools({
+    enableScreenshot: settings.screenshotToolEnabled,
+    enablePageInteraction: true,
+    enableTextExtraction: true,
+  });
+}
+
+/**
  * Tool descriptions for UI display
  */
 export const toolDescriptions = {
