@@ -18,7 +18,7 @@
     "test:e2e:headed": "pnpm build:chrome && playwright test --headed",
     "test:e2e:debug": "pnpm build:chrome && playwright test --debug",
     "lint": "biome check --diagnostic-level=error",
-    "lint:fix": "biome check --write .",
+    "lint:fix": "biome check --diagnostic-level=error --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit"
   },

@@ -281,3 +281,19 @@ export function isExtensionSettings(value: unknown): value is ExtensionSettings 
     typeof settings.screenshotToolEnabled === 'boolean'
   );
 }
+
+// Utility for creating stable, deterministic IDs based on content
+export function createStableId(prefix: string, content: string, index?: number): string {
+  // Bound content to first and last 500 chars for performance
+  const boundedContent = content.length > 1000 
+    ? content.slice(0, 500) + content.slice(-500)
+    : content;
+  
+  // Hash using reduce for cleaner implementation
+  const hash = Array.from(boundedContent).reduce((acc, char) => {
+    return ((acc << 5) - acc + char.charCodeAt(0)) & 0xffffffff;
+  }, 0);
+
+  const suffix = index !== undefined ? `-${index}` : '';
+  return `${prefix}-${Math.abs(hash)}${suffix}`;
+}

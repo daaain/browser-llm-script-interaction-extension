@@ -2,6 +2,7 @@ import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Storage } from 'webextension-polyfill';
 import browser from 'webextension-polyfill';
+import { toolDescriptions } from '~/utils/ai-tools';
 import { sidepanelLogger } from '~/utils/debug-logger';
 import type {
   ChatMessage,
@@ -10,6 +11,7 @@ import type {
   MessageFromSidebar,
   MessageToSidebar,
 } from '~/utils/types';
+import { createStableId, isExtensionSettings } from '~/utils/types';
 import ManualToolInterface from './ManualToolInterface';
 import { MemoizedMarkdown } from './MemoizedMarkdown';
 
@@ -57,12 +59,7 @@ const MessageContentComponent: React.FC<{ content: MessageContent }> = ({ conten
   if (!content) return null;
 
   if (typeof content === 'string') {
-    return (
-      <MemoizedMarkdown
-        content={content}
-        id={`content-${Math.random().toString(36).substring(2, 11)}`}
-      />
-    );
+    return <MemoizedMarkdown content={content} id={createStableId('content', content)} />;
   }
 
   return (
@@ -73,7 +70,7 @@ const MessageContentComponent: React.FC<{ content: MessageContent }> = ({ conten
             <MemoizedMarkdown
               key={`text-${item.text.substring(0, 20)}-${index}`}
               content={item.text}
-              id={`text-${index}-${Math.random().toString(36).substring(2, 11)}`}
+              id={createStableId('text', item.text, index)}
             />
           );
         } else if (item.type === 'input_image' && item.image_url) {
@@ -250,7 +247,7 @@ const MessagePart: React.FC<{ part: MessagePart; index: number }> = ({ part, ind
         <div key={index} className="assistant-text">
           <MemoizedMarkdown
             content={textPart.text}
-            id={`part-${index}-${Math.random().toString(36).substring(2, 11)}`}
+            id={createStableId('part', textPart.text, index)}
           />
         </div>
       );
@@ -390,7 +387,13 @@ const ChatInterface: React.FC = () => {
       if (isRefreshingRef.current) return;
 
       if (areaName === 'local' && changes.settings && changes.settings.newValue) {
-        const newSettings = changes.settings.newValue as ExtensionSettings;
+        // Validate settings before using them
+        if (!isExtensionSettings(changes.settings.newValue)) {
+          console.warn('Invalid settings received from storage, ignoring');
+          return;
+        }
+
+        const newSettings = changes.settings.newValue;
         setSettings(newSettings);
 
         // Update messages based on tab
@@ -623,14 +626,13 @@ const ChatInterface: React.FC = () => {
         <div id="messages" className="messages">
           {!messages || messages.length === 0 ? (
             <div className="welcome-message">
-              <h3>Welcome to LLM Chat!</h3>
+              <h3>Welcome to LLM Actions!</h3>
               <p>
                 Start a conversation with your configured LLM. The assistant can now autonomously
                 use browser automation tools when enabled in settings.
               </p>
               <p>
-                <strong>Available Tools:</strong> find elements, extract text, get page summary,
-                describe sections, and clear references.
+                <strong>Available Tools:</strong> {Object.values(toolDescriptions).join(', ')}.
               </p>
             </div>
           ) : (

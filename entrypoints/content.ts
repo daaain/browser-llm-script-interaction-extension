@@ -3,6 +3,31 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 import { createLLMHelper } from '~/utils/llm-helper';
 import type { ContentScriptFunctionRequest } from '~/utils/types';
 
+// Validation functions for tool arguments
+function validateStringArg(value: unknown, name: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${name} must be a string, got ${typeof value}`);
+  }
+  return value;
+}
+
+function validateOptionalStringArg(value: unknown, name: string): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'string') {
+    throw new Error(`${name} must be a string or undefined, got ${typeof value}`);
+  }
+  return value;
+}
+
+function validateNumberArg(value: unknown, name: string): number {
+  if (typeof value !== 'number') {
+    throw new Error(`${name} must be a number, got ${typeof value}`);
+  }
+  return value;
+}
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   main(_ctx) {
@@ -27,19 +52,22 @@ export default defineContentScript({
             switch (functionName) {
               case 'find':
                 result = LLMHelper.find(
-                  args.pattern as string,
+                  validateStringArg(args.pattern, 'pattern'),
                   args.options as
                     | { limit?: number; type?: string; visible?: boolean; offset?: number }
                     | undefined,
                 );
                 break;
               case 'click':
-                result = LLMHelper.click(args.selector as string, args.text as string | undefined);
+                result = LLMHelper.click(
+                  validateStringArg(args.selector, 'selector'),
+                  validateOptionalStringArg(args.text, 'text'),
+                );
                 break;
               case 'type':
                 result = LLMHelper.type(
-                  args.selector as string,
-                  args.text as string,
+                  validateStringArg(args.selector, 'selector'),
+                  validateStringArg(args.text, 'text'),
                   args.options as
                     | { clear?: boolean; delay?: number; pressEnter?: boolean }
                     | undefined,
@@ -47,12 +75,12 @@ export default defineContentScript({
                 break;
               case 'extract':
                 result = LLMHelper.extract(
-                  args.selector as string,
-                  args.property as string | undefined,
+                  validateStringArg(args.selector, 'selector'),
+                  validateOptionalStringArg(args.property, 'property'),
                 );
                 break;
               case 'describe':
-                result = LLMHelper.describe(args.selector as string);
+                result = LLMHelper.describe(validateStringArg(args.selector, 'selector'));
                 break;
               case 'summary':
                 result = LLMHelper.summary();
@@ -72,7 +100,10 @@ export default defineContentScript({
                 return true; // Keep message channel open for async response
               case 'getResponsePage':
                 // Handle getResponsePage asynchronously
-                LLMHelper.getResponsePage(args.responseId as string, args.page as number)
+                LLMHelper.getResponsePage(
+                  validateStringArg(args.responseId, 'responseId'),
+                  validateNumberArg(args.page, 'page'),
+                )
                   .then((result: { result: unknown; _meta: unknown }) => {
                     sendResponse({ success: true, result: result.result, _meta: result._meta });
                   })

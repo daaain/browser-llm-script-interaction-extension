@@ -286,10 +286,13 @@ class ResponseManagerClass {
   }
 
   /**
-   * Generate a unique response ID
+   * Generate a unique response ID using timestamp and counter
    */
+  private static idCounter = 0;
+
   private generateResponseId(): string {
-    return `resp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    ResponseManagerClass.idCounter = (ResponseManagerClass.idCounter + 1) % 10000;
+    return `resp_${Date.now()}_${ResponseManagerClass.idCounter.toString().padStart(4, '0')}`;
   }
 
   /**
