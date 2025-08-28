@@ -285,10 +285,9 @@ export function isExtensionSettings(value: unknown): value is ExtensionSettings 
 // Utility for creating stable, deterministic IDs based on content
 export function createStableId(prefix: string, content: string, index?: number): string {
   // Bound content to first and last 500 chars for performance
-  const boundedContent = content.length > 1000 
-    ? content.slice(0, 500) + content.slice(-500)
-    : content;
-  
+  const boundedContent =
+    content.length > 1000 ? content.slice(0, 500) + content.slice(-500) : content;
+
   // Hash using reduce for cleaner implementation
   const hash = Array.from(boundedContent).reduce((acc, char) => {
     return ((acc << 5) - acc + char.charCodeAt(0)) & 0xffffffff;
