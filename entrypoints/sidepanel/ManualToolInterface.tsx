@@ -152,7 +152,7 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
                 id={fieldId}
                 type="number"
                 className="tool-input"
-                value={value}
+                value={typeof value === 'number' ? value : 0}
                 onChange={(e) => handleInputChange(key, parseFloat(e.target.value) || 0)}
                 disabled={isExecuting}
               />
@@ -169,7 +169,7 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
               <select
                 id={fieldId}
                 className="tool-select"
-                value={value}
+                value={typeof value === 'string' ? value : ''}
                 onChange={(e) => handleInputChange(key, e.target.value)}
                 disabled={isExecuting}
               >
@@ -209,7 +209,7 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
                 id={fieldId}
                 type="text"
                 className="tool-input"
-                value={value}
+                value={typeof value === 'string' ? value : ''}
                 onChange={(e) => handleInputChange(key, e.target.value)}
                 disabled={isExecuting}
                 placeholder={param.description ? `e.g. ${param.description}` : ''}

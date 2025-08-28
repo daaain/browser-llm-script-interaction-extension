@@ -1,19 +1,10 @@
 // Import types for AI SDK integration
 import { openai } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import {
-  convertToModelMessages,
-  FilePart,
-  type ModelMessage,
-  stepCountIs,
-  streamText,
-  type TextPart,
-  type ToolCallPart,
-  type ToolResultPart,
-} from 'ai';
+import { convertToModelMessages, type ModelMessage, stepCountIs, streamText } from 'ai';
 import { availableTools, getToolsForSettings } from './ai-tools';
 import { backgroundLogger } from './debug-logger';
-import type { LLMProvider } from './types';
+import type { ExtendedPart, ExtendedToolCallPart, LLMProvider } from './types';
 
 /**
  * LLM Service
@@ -269,7 +260,7 @@ export class LLMService {
       backgroundLogger.info('AI SDK streaming started');
 
       // Build UI message parts as we stream
-      const messageParts: Array<TextPart | ToolCallPart | ToolResultPart> = [];
+      const messageParts: Array<ExtendedPart> = [];
       let lastTextIndex = 0;
 
       // Stream the full stream with all event types
@@ -298,12 +289,12 @@ export class LLMService {
             }
 
             // Add tool call part
-            const toolCallPart: ToolCallPart = {
-              type: part.type,
+            const toolCallPart: ExtendedToolCallPart = {
+              type: 'tool-call',
               toolCallId: part.toolCallId,
               toolName: part.toolName,
               input: part.input,
-              // state: 'input-available',
+              state: 'input-available',
             };
             messageParts.push(toolCallPart);
 
@@ -328,18 +319,26 @@ export class LLMService {
             });
 
             // Update the tool part with result or error
-            const toolResultIndex = messageParts.findIndex((p) => p.toolCallId === part.toolCallId);
+            const toolResultIndex = messageParts.findIndex(
+              (p) =>
+                p.type === 'tool-call' &&
+                (p as ExtendedToolCallPart).toolCallId === part.toolCallId,
+            );
             if (toolResultIndex >= 0) {
+              const toolPart = messageParts[toolResultIndex] as ExtendedToolCallPart;
               // Check if this is an error result (AI SDK isError flag or error object pattern)
               const isError =
-                (part as any).isError ||
+                (part as unknown as { isError?: boolean }).isError ||
                 (part.output &&
                   typeof part.output === 'object' &&
                   'error' in part.output &&
-                  !('success' in part.output && part.output.success === true));
+                  !(
+                    'success' in part.output &&
+                    (part.output as { success: boolean }).success === true
+                  ));
 
               if (isError) {
-                messageParts[toolResultIndex].state = 'output-error';
+                toolPart.state = 'output-error';
                 // Extract error message from various formats
                 let errorText = 'Tool execution failed';
                 if (typeof part.output === 'string') {
@@ -349,12 +348,12 @@ export class LLMService {
                   typeof part.output === 'object' &&
                   'error' in part.output
                 ) {
-                  errorText = part.output.error;
+                  errorText = (part.output as { error: string }).error;
                 }
-                messageParts[toolResultIndex].errorText = errorText;
+                toolPart.errorText = errorText;
               } else {
-                messageParts[toolResultIndex].state = 'output-available';
-                messageParts[toolResultIndex].output = part.output;
+                toolPart.state = 'output-available';
+                toolPart.output = part.output;
               }
             }
 

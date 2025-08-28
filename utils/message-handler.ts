@@ -4,7 +4,8 @@ import { backgroundLogger } from '~/utils/debug-logger';
 import { createLLMService } from '~/utils/llm-service';
 import { responseManager } from '~/utils/response-manager';
 import { settingsManager } from '~/utils/settings-manager';
-import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from '~/utils/types';
+import type { ExtensionSettings, FunctionResponsePayload, MessageToSidebar } from '~/utils/types';
+import { isExtensionSettings, isMessageFromSidebar } from '~/utils/types';
 
 /**
  * Message Handler
@@ -27,7 +28,13 @@ export class MessageHandler {
   ): Promise<void> {
     try {
       console.log('📨 AISDKMessageHandler.handleMessage called with:', message);
-      const msg = message as MessageToSidebar | MessageFromSidebar;
+
+      if (!isMessageFromSidebar(message)) {
+        this.sendErrorResponse(sendResponse, 'Invalid message format');
+        return;
+      }
+
+      const msg = message;
       console.log('📍 Message type:', msg.type);
 
       switch (msg.type) {
@@ -36,6 +43,10 @@ export class MessageHandler {
           break;
 
         case 'SAVE_SETTINGS':
+          if (!isExtensionSettings(msg.payload)) {
+            this.sendErrorResponse(sendResponse, 'Invalid settings format');
+            return;
+          }
           await this.handleSaveSettings(msg.payload, sendResponse);
           break;
 
@@ -59,11 +70,11 @@ export class MessageHandler {
           break;
 
         case 'EXECUTE_FUNCTION':
-          await this.handleExecuteFunction((msg as any).payload, sendResponse);
+          await this.handleExecuteFunction(msg.payload, sendResponse);
           break;
 
         case 'GET_RESPONSE_PAGE':
-          await this.handleGetResponsePage((msg as any).payload, sendResponse);
+          await this.handleGetResponsePage(msg.payload, sendResponse);
           break;
 
         default:
@@ -228,7 +239,7 @@ export class MessageHandler {
   }
 
   private async handleExecuteFunction(
-    payload: { function: string; arguments: any },
+    payload: { function: string; arguments: Record<string, unknown> },
     sendResponse: (response: MessageToSidebar) => void,
   ): Promise<void> {
     try {
@@ -257,7 +268,7 @@ export class MessageHandler {
 
       const response: MessageToSidebar = {
         type: 'FUNCTION_RESPONSE',
-        payload: result,
+        payload: result as FunctionResponsePayload,
       };
       backgroundLogger.info('Function executed successfully', { result });
       sendResponse(response);

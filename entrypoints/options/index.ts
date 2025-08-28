@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
 import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from '~/utils/types';
-import { DEFAULT_PROVIDERS } from '~/utils/types';
+import { DEFAULT_PROVIDERS, isExtensionSettings } from '~/utils/types';
 
 class SettingsManager {
   private currentSettings: ExtensionSettings | null = null;
@@ -30,9 +30,14 @@ class SettingsManager {
       console.debug('Settings response:', JSON.stringify(response));
 
       if (response.type === 'SETTINGS_RESPONSE') {
-        this.currentSettings = response.payload;
-        this.populateForm();
-        console.debug('Settings loaded successfully');
+        if (isExtensionSettings(response.payload)) {
+          this.currentSettings = response.payload;
+          this.populateForm();
+          console.debug('Settings loaded successfully');
+        } else {
+          console.error('Received invalid settings response');
+          this.showMessage('Error loading settings. Please try refreshing.', 'error');
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -224,7 +229,7 @@ class SettingsManager {
       // Now test the connection using the background script
       const testMessage: MessageFromSidebar = {
         type: 'TEST_CONNECTION',
-        payload: {},
+        payload: null,
       };
 
       const response = (await browser.runtime.sendMessage(testMessage)) as MessageToSidebar;

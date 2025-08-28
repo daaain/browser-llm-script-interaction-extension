@@ -26,19 +26,33 @@ export default defineContentScript({
             let result: unknown;
             switch (functionName) {
               case 'find':
-                result = LLMHelper.find(args.pattern, args.options);
+                result = LLMHelper.find(
+                  args.pattern as string,
+                  args.options as
+                    | { limit?: number; type?: string; visible?: boolean; offset?: number }
+                    | undefined,
+                );
                 break;
               case 'click':
-                result = LLMHelper.click(args.selector, args.text);
+                result = LLMHelper.click(args.selector as string, args.text as string | undefined);
                 break;
               case 'type':
-                result = LLMHelper.type(args.selector, args.text, args.options);
+                result = LLMHelper.type(
+                  args.selector as string,
+                  args.text as string,
+                  args.options as
+                    | { clear?: boolean; delay?: number; pressEnter?: boolean }
+                    | undefined,
+                );
                 break;
               case 'extract':
-                result = LLMHelper.extract(args.selector, args.property);
+                result = LLMHelper.extract(
+                  args.selector as string,
+                  args.property as string | undefined,
+                );
                 break;
               case 'describe':
-                result = LLMHelper.describe(args.selector);
+                result = LLMHelper.describe(args.selector as string);
                 break;
               case 'summary':
                 result = LLMHelper.summary();

@@ -458,7 +458,7 @@ const ChatInterface: React.FC = () => {
 
     const message: MessageFromSidebar = {
       type: 'SEND_MESSAGE',
-      payload: { message: messageText, tabId },
+      payload: { message: messageText, tabId: tabId ?? undefined },
     };
 
     try {
