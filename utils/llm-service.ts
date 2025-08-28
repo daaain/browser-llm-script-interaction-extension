@@ -1,7 +1,16 @@
 // Import types for AI SDK integration
 import { openai } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { convertToModelMessages, stepCountIs, streamText } from 'ai';
+import {
+  convertToModelMessages,
+  FilePart,
+  type ModelMessage,
+  stepCountIs,
+  streamText,
+  type TextPart,
+  type ToolCallPart,
+  type ToolResultPart,
+} from 'ai';
 import { availableTools, getToolsForSettings } from './ai-tools';
 import { backgroundLogger } from './debug-logger';
 import type { LLMProvider } from './types';
@@ -69,7 +78,7 @@ export class LLMService {
         const parts: Array<any> = [];
 
         // Add text content if present
-        if (msg.content && msg.content.trim()) {
+        if (msg.content?.trim()) {
           parts.push({
             type: 'text' as const,
             text: msg.content,
@@ -96,7 +105,7 @@ export class LLMService {
 
       // Regular user, assistant, or system message
       const parts = [];
-      if (msg.content && msg.content.trim()) {
+      if (msg.content?.trim()) {
         parts.push({
           type: 'text' as const,
           text: msg.content,
@@ -121,7 +130,7 @@ export class LLMService {
     }
     // If no specific endpoint path, assume it's already a base URL
     if (!endpoint.endsWith('/v1')) {
-      return endpoint + '/v1';
+      return `${endpoint}/v1`;
     }
     return endpoint;
   }
@@ -140,7 +149,7 @@ export class LLMService {
     try {
       // Get tools based on settings
       const toolsToUse = toolSettings ? getToolsForSettings(toolSettings) : availableTools;
-      
+
       backgroundLogger.info('LLM Service streamMessage called', {
         enableTools,
         messageCount: messages?.length,
@@ -156,7 +165,7 @@ export class LLMService {
         });
 
         if (!messages || !Array.isArray(messages)) {
-          throw new Error('messages is not an array: ' + typeof messages);
+          throw new Error(`messages is not an array: ${typeof messages}`);
         }
 
         backgroundLogger.debug('Converting to UI messages...');
@@ -166,7 +175,7 @@ export class LLMService {
           uiMessages,
         });
 
-        let modelMessages;
+        let modelMessages: ModelMessage[];
         try {
           // Validate that uiMessages is an array and has expected structure
           if (!Array.isArray(uiMessages)) {
@@ -212,7 +221,7 @@ export class LLMService {
       backgroundLogger.info('Starting AI SDK streaming tool-enabled generation');
 
       if (!messages || !Array.isArray(messages)) {
-        throw new Error('messages is not an array: ' + typeof messages);
+        throw new Error(`messages is not an array: ${typeof messages}`);
       }
 
       const uiMessages = this.convertToUIMessages(messages);
@@ -221,7 +230,7 @@ export class LLMService {
         uiMessages,
       });
 
-      let modelMessages;
+      let modelMessages: ModelMessage[];
       try {
         // Validate that uiMessages is an array and has expected structure
         if (!Array.isArray(uiMessages)) {
@@ -260,7 +269,7 @@ export class LLMService {
       backgroundLogger.info('AI SDK streaming started');
 
       // Build UI message parts as we stream
-      const messageParts: any[] = [];
+      const messageParts: Array<TextPart | ToolCallPart | ToolResultPart> = [];
       let lastTextIndex = 0;
 
       // Stream the full stream with all event types
@@ -289,12 +298,12 @@ export class LLMService {
             }
 
             // Add tool call part
-            const toolCallPart = {
-              type: `tool-${part.toolName}`,
+            const toolCallPart: ToolCallPart = {
+              type: part.type,
               toolCallId: part.toolCallId,
               toolName: part.toolName,
               input: part.input,
-              state: 'input-available',
+              // state: 'input-available',
             };
             messageParts.push(toolCallPart);
 

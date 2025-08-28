@@ -170,13 +170,16 @@ export function isValidLLMHelperMethod(
     'describe',
     'screenshot',
   ] as const;
-  return validMethods.includes(functionName as any);
+  return validMethods.includes(functionName as (typeof validMethods)[number]);
 }
 
 /**
  * Parses and validates tool call arguments for LLMHelper methods
  */
-export function parseToolCallArguments(functionName: string, argumentsString: string): any {
+export function parseToolCallArguments(
+  functionName: string,
+  argumentsString: string,
+): Record<string, unknown> {
   try {
     const args = JSON.parse(argumentsString);
 

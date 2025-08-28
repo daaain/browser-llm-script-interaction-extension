@@ -1,6 +1,7 @@
 import browser from 'webextension-polyfill';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { createLLMHelper } from '~/utils/llm-helper';
+import type { ContentScriptFunctionRequest } from '~/utils/types';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -9,18 +10,20 @@ export default defineContentScript({
     const LLMHelper = createLLMHelper();
 
     // Make LLMHelper globally available
-    (window as any).LLMHelper = LLMHelper;
+    (window as typeof window & { LLMHelper: ReturnType<typeof createLLMHelper> }).LLMHelper =
+      LLMHelper;
 
     // Listen for messages from the extension
-    browser.runtime.onMessage.addListener((request: any, _sender, sendResponse) => {
-      if (request.type === 'EXECUTE_FUNCTION') {
+    browser.runtime.onMessage.addListener((request: unknown, _sender, sendResponse) => {
+      const typedRequest = request as ContentScriptFunctionRequest;
+      if (typedRequest.type === 'EXECUTE_FUNCTION') {
         try {
-          const functionName = request.function;
-          const args = request.arguments || {};
+          const functionName = typedRequest.function;
+          const args = typedRequest.arguments || {};
 
           if (functionName in LLMHelper) {
             // Handle function arguments properly based on function signature
-            let result;
+            let result: unknown;
             switch (functionName) {
               case 'find':
                 result = LLMHelper.find(args.pattern, args.options);
@@ -55,8 +58,8 @@ export default defineContentScript({
                 return true; // Keep message channel open for async response
               case 'getResponsePage':
                 // Handle getResponsePage asynchronously
-                LLMHelper.getResponsePage(args.responseId, args.page)
-                  .then((result: any) => {
+                LLMHelper.getResponsePage(args.responseId as string, args.page as number)
+                  .then((result: { result: unknown; _meta: unknown }) => {
                     sendResponse({ success: true, result: result.result, _meta: result._meta });
                   })
                   .catch((error: unknown) => {

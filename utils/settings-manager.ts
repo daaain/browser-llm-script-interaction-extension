@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
-import type { ExtensionSettings } from '~/utils/types';
+import type { ChatMessage, ExtensionSettings } from '~/utils/types';
 import { DEFAULT_PROVIDERS } from '~/utils/types';
 
 export class SettingsManager {
@@ -90,7 +90,7 @@ export class SettingsManager {
     }
   }
 
-  async updateTabConversation(tabId: number, conversation: any[]): Promise<void> {
+  async updateTabConversation(tabId: number, conversation: ChatMessage[]): Promise<void> {
     try {
       const settings = await this.getSettings();
       const tabConversations = settings.tabConversations || {};
@@ -106,7 +106,7 @@ export class SettingsManager {
     }
   }
 
-  async updateGlobalHistory(conversation: any[]): Promise<void> {
+  async updateGlobalHistory(conversation: ChatMessage[]): Promise<void> {
     try {
       const settings = await this.getSettings();
       await this.saveSettings({
@@ -123,7 +123,7 @@ export class SettingsManager {
     try {
       const settings = await this.getSettings();
 
-      if (settings.tabConversations && settings.tabConversations[tabId.toString()]) {
+      if (settings.tabConversations?.[tabId.toString()]) {
         delete settings.tabConversations[tabId.toString()];
       }
 
@@ -142,7 +142,7 @@ export class SettingsManager {
     }
   }
 
-  async getTabConversation(tabId?: number): Promise<any[]> {
+  async getTabConversation(tabId?: number): Promise<ChatMessage[]> {
     const settings = await this.getSettings();
 
     if (tabId) {

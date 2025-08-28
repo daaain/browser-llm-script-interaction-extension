@@ -1,6 +1,5 @@
 import { expect, test } from './fixtures';
 import './types';
-import * as fs from 'node:fs';
 
 test.describe('JSON Formatting in Tool Results', () => {
   test.beforeEach(async ({ context }) => {
@@ -28,7 +27,6 @@ test.describe('JSON Formatting in Tool Results', () => {
     await optionsPage.locator('#model-input').fill('mock-model');
 
     // Ensure tools are enabled
-    const toolsEnabledCheckbox = optionsPage.locator('#tools-enabled');
 
     // Use JavaScript evaluation to set checkbox state reliably
     await optionsPage.evaluate(() => {
@@ -214,7 +212,7 @@ test.describe('JSON Formatting in Tool Results', () => {
     await optionsPage.locator('#endpoint-input').fill('http://localhost:1234/v1/chat/completions');
     await optionsPage.locator('#model-input').fill('mock-model');
 
-    const toolsEnabledCheckbox = optionsPage.locator('#tools-enabled');
+    // Ensure tools are enabled - we don't need to store the locator since we use direct JS evaluation below
 
     // Use JavaScript evaluation to set checkbox state reliably
     await optionsPage.evaluate(() => {

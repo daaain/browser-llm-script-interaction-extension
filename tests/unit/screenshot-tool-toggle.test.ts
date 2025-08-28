@@ -30,7 +30,7 @@ describe('Screenshot Tool Toggle', () => {
   it('should always include pagination tool when tools are enabled', () => {
     const settings1 = { toolsEnabled: true, screenshotToolEnabled: true };
     const settings2 = { toolsEnabled: true, screenshotToolEnabled: false };
-    
+
     const tools1 = getToolsForSettings(settings1);
     const tools2 = getToolsForSettings(settings2);
 

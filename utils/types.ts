@@ -23,7 +23,7 @@ export interface ChatMessage {
   tool_calls?: LLMToolCall[];
   tool_call_id?: string;
   isStreaming?: boolean;
-  tool_results?: Array<{ id: string; result: any; error?: string }>;
+  tool_results?: ToolResult[];
   parentMessageId?: string;
   toolRound?: number;
 }
@@ -36,7 +36,7 @@ export interface StreamingChatMessage extends ChatMessage {
 
 export interface ToolResult {
   id: string;
-  result: any;
+  result: unknown;
   error?: string;
 }
 
@@ -87,7 +87,7 @@ export interface MessageFromSidebar {
     | 'CAPTURE_SCREENSHOT'
     | 'TEST_CONNECTION'
     | 'GET_RESPONSE_PAGE';
-  payload: any;
+  payload: unknown;
 }
 
 export interface MessageToSidebar {
@@ -98,18 +98,18 @@ export interface MessageToSidebar {
     | 'FUNCTION_RESPONSE'
     | 'TEST_CONNECTION_RESPONSE'
     | 'RESPONSE_PAGE';
-  payload: any;
+  payload: unknown;
 }
 
 export interface ContentScriptFunctionRequest {
   type: 'EXECUTE_FUNCTION';
   function: string;
-  arguments: any;
+  arguments: Record<string, unknown>;
 }
 
 export interface ContentScriptFunctionResponse {
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
 }
 
@@ -134,6 +134,16 @@ export interface ExtensionSettings {
   tabConversations?: { [tabId: string]: ChatMessage[] };
   toolsEnabled: boolean;
   screenshotToolEnabled: boolean;
+}
+
+// Chrome-specific sidePanel API types
+export interface ChromeSidePanel {
+  setPanelBehavior(options: { openPanelOnActionClick: boolean }): Promise<void>;
+}
+
+// Extended browser interface for Chrome-specific APIs
+export interface ExtendedBrowser {
+  sidePanel?: ChromeSidePanel;
 }
 
 export const DEFAULT_PROVIDERS: Omit<LLMProvider, 'apiKey'>[] = [

@@ -6,7 +6,8 @@ Roadmap / TODO:
 - see chat history
 - share / export individual chats
 - save complex function call sequence into action scripts
-- system prompt with and without tools
+- remove disable tool usage setting, not worth trying to support that use case
+- customisable system prompt
 - tutorial / welcome screen
 - handle text selection - add to context with little popup? that could also trigger opening the sidebar?
 - maybe also right click context menu element selection for interaction?

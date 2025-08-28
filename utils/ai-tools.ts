@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import browser from 'webextension-polyfill';
 import { z } from 'zod/v3';
-import { responseManager, type TruncationResult } from './response-manager';
+import { responseManager } from './response-manager';
 import type { ContentScriptFunctionRequest, ContentScriptFunctionResponse } from './types';
 
 /**
@@ -397,16 +397,18 @@ export const clickTool = tool({
     ) {
       const elements = result.result.elements;
       const searchText = result.result.searchText;
-      
+
       // Create helpful guidance for each element
-      const elementInstructions = elements.map((el: any, index: number) => {
-        const elementType = el.tag;
-        const elementText = el.text ? `"${el.text}"` : 'no text';
-        const classes = el.classes ? ` with classes "${el.classes}"` : '';
-        
-        return `${index + 1}. ${elementType} element (${elementText})${classes}\n   Use: click(selector: "${el.selector}")`;
-      }).join('\n');
-      
+      const elementInstructions = elements
+        .map((el: any, index: number) => {
+          const elementType = el.tag;
+          const elementText = el.text ? `"${el.text}"` : 'no text';
+          const classes = el.classes ? ` with classes "${el.classes}"` : '';
+
+          return `${index + 1}. ${elementType} element (${elementText})${classes}\n   Use: click(selector: "${el.selector}")`;
+        })
+        .join('\n');
+
       return {
         success: true,
         result: `Multiple elements found containing "${searchText}". Please choose one:\n\n${elementInstructions}`,
@@ -557,7 +559,10 @@ export function getConfiguredTools(
  * Get tools based on extension settings
  * Uses the extension configuration to determine which tools to enable
  */
-export function getToolsForSettings(settings: { toolsEnabled: boolean; screenshotToolEnabled: boolean }): Record<string, any> {
+export function getToolsForSettings(settings: {
+  toolsEnabled: boolean;
+  screenshotToolEnabled: boolean;
+}): Record<string, any> {
   if (!settings.toolsEnabled) {
     return {};
   }

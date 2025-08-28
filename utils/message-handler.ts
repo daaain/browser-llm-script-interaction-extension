@@ -41,7 +41,7 @@ export class MessageHandler {
 
         case 'SEND_MESSAGE':
           backgroundLogger.info('Handling SEND_MESSAGE', {
-            message: msg.payload.message?.substring(0, 50) + '...',
+            message: `${msg.payload.message?.substring(0, 50)}...`,
             tabId: msg.payload.tabId,
           });
           await this.handleSendMessage(msg.payload.message, msg.payload.tabId, sendResponse);
@@ -123,7 +123,7 @@ export class MessageHandler {
       responseContent = await chatManager.sendChatMessage(message, tabId);
 
       console.log('✅ Chat manager returned:', {
-        responseContent: responseContent.substring(0, 100) + '...',
+        responseContent: `${responseContent.substring(0, 100)}...`,
       });
 
       const response: MessageToSidebar = {

@@ -109,7 +109,9 @@ class SettingsManager {
     // Auto-save for checkboxes
     const debugModeCheckbox = document.getElementById('debug-mode') as HTMLInputElement;
     const toolsEnabledCheckbox = document.getElementById('tools-enabled') as HTMLInputElement;
-    const screenshotToolEnabledCheckbox = document.getElementById('screenshot-tool-enabled') as HTMLInputElement;
+    const screenshotToolEnabledCheckbox = document.getElementById(
+      'screenshot-tool-enabled',
+    ) as HTMLInputElement;
     debugModeCheckbox.addEventListener('change', () => this.autoSave());
     toolsEnabledCheckbox.addEventListener('change', () => this.autoSave());
     screenshotToolEnabledCheckbox.addEventListener('change', () => this.autoSave());
@@ -137,7 +139,9 @@ class SettingsManager {
       const apiKey = (document.getElementById('api-key-input') as HTMLInputElement).value;
       const debugMode = (document.getElementById('debug-mode') as HTMLInputElement).checked;
       const toolsEnabled = (document.getElementById('tools-enabled') as HTMLInputElement).checked;
-      const screenshotToolEnabled = (document.getElementById('screenshot-tool-enabled') as HTMLInputElement).checked;
+      const screenshotToolEnabled = (
+        document.getElementById('screenshot-tool-enabled') as HTMLInputElement
+      ).checked;
       const truncationLimit =
         parseInt(
           (document.getElementById('truncation-limit-input') as HTMLInputElement).value,
@@ -149,8 +153,13 @@ class SettingsManager {
         return;
       }
 
+      if (!this.currentSettings) {
+        console.warn('No current settings available for auto-save');
+        return;
+      }
+
       const updatedSettings: ExtensionSettings = {
-        ...this.currentSettings!,
+        ...this.currentSettings,
         provider: {
           name: 'Custom',
           endpoint,
@@ -188,9 +197,14 @@ class SettingsManager {
     }
 
     try {
+      if (!this.currentSettings) {
+        this.showMessage('Settings not loaded. Please refresh and try again.', 'error');
+        return;
+      }
+
       // First save the current settings so the background script can test with them
       const updatedSettings: ExtensionSettings = {
-        ...this.currentSettings!,
+        ...this.currentSettings,
         provider: {
           name: (document.getElementById('provider-select') as HTMLInputElement).value || 'Custom',
           endpoint,
