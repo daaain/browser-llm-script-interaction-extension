@@ -51,7 +51,6 @@ test.describe('Sidepanel Interface', () => {
     await expect(page.locator('#settings-btn')).toBeVisible();
   });
 
-
   test('should have working settings button', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
@@ -106,7 +105,6 @@ test.describe('Options Page', () => {
     await expect(page.locator('label[for="model-input"]')).toContainText('Model:');
     await expect(page.locator('label[for="api-key-input"]')).toContainText('API Key:');
   });
-
 
   test('should have action buttons', async ({ context, extensionId }) => {
     const page = await context.newPage();
