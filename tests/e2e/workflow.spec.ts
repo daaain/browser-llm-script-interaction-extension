@@ -164,7 +164,7 @@ test.describe('Complete User Workflow', () => {
     await expect(sidepanelPage.locator('.tool-header h4')).toContainText('Manual Tool Testing');
 
     // Step 4: Test tool selector is present and functional
-    const toolSelect = sidepanelPage.locator('#tool-select');
+    const toolSelect = sidepanelPage.locator('.tool-select');
     await expect(toolSelect).toBeVisible();
 
     // Should have tools available (extract, find, etc.)
