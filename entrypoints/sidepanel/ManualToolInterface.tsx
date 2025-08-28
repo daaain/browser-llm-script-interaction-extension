@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import {
   extractToolsMetadata,
   type ParameterDefinition,
@@ -8,7 +8,7 @@ import {
 } from '~/utils/tool-metadata-extractor';
 
 interface ManualToolInterfaceProps {
-  onExecuteTool: (toolName: string, args: any) => Promise<void>;
+  onExecuteTool: (toolName: string, args: Record<string, unknown>) => Promise<void>;
   isExecuting?: boolean;
 }
 
@@ -16,10 +16,33 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
   onExecuteTool,
   isExecuting = false,
 }) => {
+  const selectId = useId();
   const [availableTools, setAvailableTools] = useState<ToolMetadata[]>([]);
   const [selectedTool, setSelectedTool] = useState<string>('');
-  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  const initializeFormData = useCallback(
+    (params: ParameterDefinition[], target: Record<string, unknown>, prefix: string = '') => {
+      params.forEach((param) => {
+        const key = prefix ? `${prefix}.${param.name}` : param.name;
+
+        if (param.defaultValue !== undefined) {
+          target[key] = param.defaultValue;
+        } else if (param.type === 'boolean') {
+          target[key] = false;
+        } else if (param.type === 'number') {
+          target[key] = 0;
+        } else if (param.type === 'object' && param.properties) {
+          target[key] = {};
+          initializeFormData(param.properties, target, key);
+        } else {
+          target[key] = '';
+        }
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     const tools = extractToolsMetadata();
@@ -36,38 +59,15 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
     if (selectedTool) {
       const tool = availableTools.find((t) => t.name === selectedTool);
       if (tool) {
-        const initialData: Record<string, any> = {};
+        const initialData: Record<string, unknown> = {};
         initializeFormData(tool.parameters, initialData);
         setFormData(initialData);
         setValidationErrors([]);
       }
     }
-  }, [selectedTool, availableTools]);
+  }, [selectedTool, availableTools, initializeFormData]);
 
-  const initializeFormData = (
-    params: ParameterDefinition[],
-    target: Record<string, any>,
-    prefix: string = '',
-  ) => {
-    params.forEach((param) => {
-      const key = prefix ? `${prefix}.${param.name}` : param.name;
-
-      if (param.defaultValue !== undefined) {
-        target[key] = param.defaultValue;
-      } else if (param.type === 'boolean') {
-        target[key] = false;
-      } else if (param.type === 'number') {
-        target[key] = 0;
-      } else if (param.type === 'object' && param.properties) {
-        target[key] = {};
-        initializeFormData(param.properties, target, key);
-      } else {
-        target[key] = '';
-      }
-    });
-  };
-
-  const handleInputChange = (key: string, value: any) => {
+  const handleInputChange = (key: string, value: unknown) => {
     setFormData((prev) => ({
       ...prev,
       [key]: value,
@@ -96,18 +96,19 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
     await onExecuteTool(selectedTool, args);
   };
 
-  const convertFlatDataToNested = (flatData: Record<string, any>): any => {
-    const result: any = {};
+  const convertFlatDataToNested = (flatData: Record<string, unknown>): Record<string, unknown> => {
+    const result: Record<string, unknown> = {};
 
     Object.entries(flatData).forEach(([key, value]) => {
       const parts = key.split('.');
       let current = result;
 
       for (let i = 0; i < parts.length - 1; i++) {
-        if (!(parts[i] in current)) {
-          current[parts[i]] = {};
+        const part = parts[i];
+        if (!(part in current)) {
+          current[part] = {};
         }
-        current = current[parts[i]];
+        current = current[part] as Record<string, unknown>;
       }
 
       current[parts[parts.length - 1]] = value;
@@ -151,7 +152,7 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
                 id={fieldId}
                 type="number"
                 className="tool-input"
-                value={value}
+                value={typeof value === 'number' ? value : 0}
                 onChange={(e) => handleInputChange(key, parseFloat(e.target.value) || 0)}
                 disabled={isExecuting}
               />
@@ -168,7 +169,7 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
               <select
                 id={fieldId}
                 className="tool-select"
-                value={value}
+                value={typeof value === 'string' ? value : ''}
                 onChange={(e) => handleInputChange(key, e.target.value)}
                 disabled={isExecuting}
               >
@@ -208,7 +209,7 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
                 id={fieldId}
                 type="text"
                 className="tool-input"
-                value={value}
+                value={typeof value === 'string' ? value : ''}
                 onChange={(e) => handleInputChange(key, e.target.value)}
                 disabled={isExecuting}
                 placeholder={param.description ? `e.g. ${param.description}` : ''}
@@ -237,11 +238,11 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
       </div>
 
       <div className="tool-selector">
-        <label htmlFor="tool-select" className="tool-label">
+        <label htmlFor={selectId} className="tool-label">
           Select Tool:
         </label>
         <select
-          id="tool-select"
+          id={selectId}
           className="tool-select tool-select-main"
           value={selectedTool}
           onChange={(e) => setSelectedTool(e.target.value)}
@@ -270,13 +271,14 @@ const ManualToolInterface: React.FC<ManualToolInterfaceProps> = ({
               <strong>Validation Errors:</strong>
               <ul>
                 {validationErrors.map((error, index) => (
-                  <li key={index}>{error}</li>
+                  <li key={`error-${index}-${error.slice(0, 20)}`}>{error}</li>
                 ))}
               </ul>
             </div>
           )}
 
           <button
+            type="button"
             className="tool-execute-btn"
             onClick={handleExecute}
             disabled={isExecuting || !selectedTool}

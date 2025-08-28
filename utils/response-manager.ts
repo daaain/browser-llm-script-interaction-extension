@@ -51,7 +51,7 @@ class ResponseManagerClass {
       if (settings.truncationLimit) {
         this.currentTruncationLimit = settings.truncationLimit;
       }
-    } catch (error) {
+    } catch (_error) {
       console.warn('Failed to load truncation settings, using default:', DEFAULT_TRUNCATION_LIMIT);
     }
   }
@@ -174,9 +174,9 @@ class ResponseManagerClass {
    */
   private smartJsonTruncation(
     pageContent: string,
-    originalContent: string,
-    startIndex: number,
-    endIndex: number,
+    _originalContent: string,
+    _startIndex: number,
+    _endIndex: number,
   ): string {
     // If we're in the middle of JSON, try to end at a complete object/array
     try {
@@ -205,9 +205,7 @@ class ResponseManagerClass {
       }
 
       // Fallback to basic truncation with JSON indicator
-      return (
-        pageContent + '\n\n[JSON TRUNCATED - Use getResponsePage tool with responseId to continue]'
-      );
+      return `${pageContent}\n\n[JSON TRUNCATED - Use getResponsePage tool with responseId to continue]`;
     }
   }
 
@@ -216,9 +214,9 @@ class ResponseManagerClass {
    */
   private smartTextTruncation(
     pageContent: string,
-    originalContent: string,
-    startIndex: number,
-    endIndex: number,
+    _originalContent: string,
+    _startIndex: number,
+    _endIndex: number,
   ): string {
     // Try to end at a sentence boundary
     const sentenceEndings = ['. ', '.\n', '! ', '!\n', '? ', '?\n'];
@@ -242,9 +240,7 @@ class ResponseManagerClass {
       );
     }
 
-    return (
-      pageContent + '\n\n[TRUNCATED - Use getResponsePage tool with responseId to see more content]'
-    );
+    return `${pageContent}\n\n[TRUNCATED - Use getResponsePage tool with responseId to see more content]`;
   }
 
   /**
@@ -284,14 +280,19 @@ class ResponseManagerClass {
 
     // Remove oldest entries
     const toRemove = entries.slice(0, this.responseBuffer.size - this.maxBufferSize);
-    toRemove.forEach(([id]) => this.responseBuffer.delete(id));
+    for (const [id] of toRemove) {
+      this.responseBuffer.delete(id);
+    }
   }
 
   /**
-   * Generate a unique response ID
+   * Generate a unique response ID using timestamp and counter
    */
+  private static idCounter = 0;
+
   private generateResponseId(): string {
-    return `resp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    ResponseManagerClass.idCounter = (ResponseManagerClass.idCounter + 1) % 10000;
+    return `resp_${Date.now()}_${ResponseManagerClass.idCounter.toString().padStart(4, '0')}`;
   }
 
   /**

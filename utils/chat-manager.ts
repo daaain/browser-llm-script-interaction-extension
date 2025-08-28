@@ -143,7 +143,7 @@ export class ChatManager {
         streamingMessage.isStreaming = false;
 
         // Use the UI message parts directly from AI SDK
-        if (uiMessage && uiMessage.parts) {
+        if (uiMessage?.parts) {
           (streamingMessage as any).parts = uiMessage.parts;
           streamingMessage.content = text; // Also store text for backward compatibility
           backgroundLogger.debug('Using AI SDK UI message parts', {
@@ -187,7 +187,7 @@ export class ChatManager {
         messageCount: messagesForAPI.length,
         toolsEnabled: settings.toolsEnabled,
       });
-      await this.llmService!.streamMessage(
+      await this.llmService?.streamMessage(
         messagesForAPI,
         onChunk,
         onComplete,

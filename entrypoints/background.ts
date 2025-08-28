@@ -2,6 +2,7 @@ import browser from 'webextension-polyfill';
 import { defineBackground } from 'wxt/utils/define-background';
 import { backgroundLogger } from '~/utils/debug-logger';
 import { messageHandler } from '~/utils/message-handler';
+import type { ExtendedBrowser, MessageFromSidebar } from '~/utils/types';
 
 /**
  * Background Script
@@ -13,11 +14,14 @@ export default defineBackground({
   main() {
     backgroundLogger.debug('Background script starting...');
 
-    if ((browser as any).sidePanel) {
+    const extendedBrowser = browser as ExtendedBrowser;
+    if (extendedBrowser.sidePanel) {
       backgroundLogger.debug('Chrome: Setting up sidePanel');
-      (browser as any).sidePanel
+      extendedBrowser.sidePanel
         .setPanelBehavior({ openPanelOnActionClick: true })
-        .catch((error: any) => backgroundLogger.error('Error setting panel behavior', { error }));
+        .catch((error: unknown) =>
+          backgroundLogger.error('Error setting panel behavior', { error }),
+        );
     }
 
     if (browser.sidebarAction) {
@@ -34,7 +38,7 @@ export default defineBackground({
     backgroundLogger.debug('Setting up message listener...');
     browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
       backgroundLogger.debug('Background script received message', {
-        messageType: (message as any)?.type,
+        messageType: (message as MessageFromSidebar)?.type,
       });
 
       // Handle async message processing

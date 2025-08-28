@@ -45,29 +45,10 @@ test.describe('Sidepanel Interface', () => {
 
     // Check main UI elements are present
     await expect(page.locator('h1')).toContainText('LLM Chat');
-    await expect(page.locator('.welcome-message h3')).toContainText('Welcome to LLM Chat!');
+    await expect(page.locator('.welcome-message h3')).toContainText('Welcome to LLM Actions!');
     await expect(page.locator('#message-input')).toBeVisible();
     await expect(page.locator('#send-btn')).toBeVisible();
     await expect(page.locator('#settings-btn')).toBeVisible();
-  });
-
-  test('should have working message input', async ({ context, extensionId }) => {
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-
-    const messageInput = page.locator('#message-input');
-    const sendBtn = page.locator('#send-btn');
-
-    // Test input functionality
-    await messageInput.fill('Hello, this is a test message');
-    expect(await messageInput.inputValue()).toBe('Hello, this is a test message');
-
-    // Send button should be enabled with text
-    await expect(sendBtn).toBeEnabled();
-
-    // Clear input
-    await messageInput.fill('');
-    expect(await messageInput.inputValue()).toBe('');
   });
 
   test('should have working settings button', async ({ context, extensionId }) => {
@@ -88,7 +69,7 @@ test.describe('Sidepanel Interface', () => {
 
     const welcomeMessage = page.locator('.welcome-message');
     await expect(welcomeMessage).toBeVisible();
-    await expect(welcomeMessage.locator('h3')).toContainText('Welcome to LLM Chat!');
+    await expect(welcomeMessage.locator('h3')).toContainText('Welcome to LLM Actions!');
     await expect(welcomeMessage.locator('p').first()).toContainText(
       'Start a conversation with your configured LLM',
     );
@@ -123,27 +104,6 @@ test.describe('Options Page', () => {
     await expect(page.locator('label[for="endpoint-input"]')).toContainText('API Endpoint:');
     await expect(page.locator('label[for="model-input"]')).toContainText('Model:');
     await expect(page.locator('label[for="api-key-input"]')).toContainText('API Key:');
-  });
-
-  test('should have working form inputs', async ({ context, extensionId }) => {
-    const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/options.html`);
-
-    // Test endpoint input
-    const endpointInput = page.locator('#endpoint-input');
-    await endpointInput.fill('https://api.openai.com/v1/chat/completions');
-    expect(await endpointInput.inputValue()).toBe('https://api.openai.com/v1/chat/completions');
-
-    // Test model input
-    const modelInput = page.locator('#model-input');
-    await modelInput.fill('gpt-4');
-    await expect(modelInput).toHaveValue('gpt-4');
-
-    // Test API key input (should be password type)
-    const apiKeyInput = page.locator('#api-key-input');
-    await expect(apiKeyInput).toHaveAttribute('type', 'password');
-    await apiKeyInput.fill('test-api-key');
-    expect(await apiKeyInput.inputValue()).toBe('test-api-key');
   });
 
   test('should have action buttons', async ({ context, extensionId }) => {

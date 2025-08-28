@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
 import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
 import type { ExtensionSettings, MessageFromSidebar, MessageToSidebar } from '~/utils/types';
-import { DEFAULT_PROVIDERS } from '~/utils/types';
+import { DEFAULT_PROVIDERS, isExtensionSettings } from '~/utils/types';
 
 class SettingsManager {
   private currentSettings: ExtensionSettings | null = null;
@@ -30,9 +30,14 @@ class SettingsManager {
       console.debug('Settings response:', JSON.stringify(response));
 
       if (response.type === 'SETTINGS_RESPONSE') {
-        this.currentSettings = response.payload;
-        this.populateForm();
-        console.debug('Settings loaded successfully');
+        if (isExtensionSettings(response.payload)) {
+          this.currentSettings = response.payload;
+          this.populateForm();
+          console.debug('Settings loaded successfully');
+        } else {
+          console.error('Received invalid settings response');
+          this.showMessage('Error loading settings. Please try refreshing.', 'error');
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -109,7 +114,9 @@ class SettingsManager {
     // Auto-save for checkboxes
     const debugModeCheckbox = document.getElementById('debug-mode') as HTMLInputElement;
     const toolsEnabledCheckbox = document.getElementById('tools-enabled') as HTMLInputElement;
-    const screenshotToolEnabledCheckbox = document.getElementById('screenshot-tool-enabled') as HTMLInputElement;
+    const screenshotToolEnabledCheckbox = document.getElementById(
+      'screenshot-tool-enabled',
+    ) as HTMLInputElement;
     debugModeCheckbox.addEventListener('change', () => this.autoSave());
     toolsEnabledCheckbox.addEventListener('change', () => this.autoSave());
     screenshotToolEnabledCheckbox.addEventListener('change', () => this.autoSave());
@@ -137,7 +144,9 @@ class SettingsManager {
       const apiKey = (document.getElementById('api-key-input') as HTMLInputElement).value;
       const debugMode = (document.getElementById('debug-mode') as HTMLInputElement).checked;
       const toolsEnabled = (document.getElementById('tools-enabled') as HTMLInputElement).checked;
-      const screenshotToolEnabled = (document.getElementById('screenshot-tool-enabled') as HTMLInputElement).checked;
+      const screenshotToolEnabled = (
+        document.getElementById('screenshot-tool-enabled') as HTMLInputElement
+      ).checked;
       const truncationLimit =
         parseInt(
           (document.getElementById('truncation-limit-input') as HTMLInputElement).value,
@@ -149,8 +158,13 @@ class SettingsManager {
         return;
       }
 
+      if (!this.currentSettings) {
+        console.warn('No current settings available for auto-save');
+        return;
+      }
+
       const updatedSettings: ExtensionSettings = {
-        ...this.currentSettings!,
+        ...this.currentSettings,
         provider: {
           name: 'Custom',
           endpoint,
@@ -188,9 +202,14 @@ class SettingsManager {
     }
 
     try {
+      if (!this.currentSettings) {
+        this.showMessage('Settings not loaded. Please refresh and try again.', 'error');
+        return;
+      }
+
       // First save the current settings so the background script can test with them
       const updatedSettings: ExtensionSettings = {
-        ...this.currentSettings!,
+        ...this.currentSettings,
         provider: {
           name: (document.getElementById('provider-select') as HTMLInputElement).value || 'Custom',
           endpoint,
@@ -210,7 +229,7 @@ class SettingsManager {
       // Now test the connection using the background script
       const testMessage: MessageFromSidebar = {
         type: 'TEST_CONNECTION',
-        payload: {},
+        payload: null,
       };
 
       const response = (await browser.runtime.sendMessage(testMessage)) as MessageToSidebar;

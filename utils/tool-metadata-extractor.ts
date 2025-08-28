@@ -1,4 +1,4 @@
-import { z } from 'zod/v3';
+import { type ZodTypeAny, z } from 'zod/v3';
 import { availableTools } from './ai-tools';
 
 export interface ToolMetadata {
@@ -12,7 +12,7 @@ export interface ParameterDefinition {
   type: 'string' | 'number' | 'boolean' | 'enum' | 'object';
   description?: string;
   required: boolean;
-  defaultValue?: any;
+  defaultValue?: unknown;
   enumValues?: string[];
   properties?: ParameterDefinition[]; // For nested objects
 }
@@ -21,7 +21,7 @@ export interface ParameterDefinition {
  * Extract metadata from Zod schema definitions
  */
 function extractZodSchemaInfo(
-  schema: any,
+  schema: ZodTypeAny,
   name: string = '',
   required: boolean = true,
 ): ParameterDefinition {
@@ -73,9 +73,10 @@ function extractZodSchemaInfo(
 
       const shape = schema._def.shape();
       for (const [key, value] of Object.entries(shape)) {
+        const typedValue = value as ZodTypeAny;
         const isRequired =
-          !schema._def.unknownKeys && !((value as any)._def?.typeName === 'ZodOptional');
-        baseParam.properties.push(extractZodSchemaInfo(value as any, key, isRequired));
+          !schema._def.unknownKeys && !(typedValue._def?.typeName === 'ZodOptional');
+        baseParam.properties.push(extractZodSchemaInfo(typedValue, key, isRequired));
       }
       break;
     }
@@ -99,19 +100,21 @@ export function extractToolsMetadata(): ToolMetadata[] {
     try {
       const metadata: ToolMetadata = {
         name: toolName,
-        description: (toolDefinition as any).description || `Execute ${toolName} tool`,
+        description:
+          (toolDefinition as { description?: string }).description || `Execute ${toolName} tool`,
         parameters: [],
       };
 
       // Extract schema information
-      const inputSchema = (toolDefinition as any).inputSchema;
+      const inputSchema = (toolDefinition as { inputSchema?: ZodTypeAny }).inputSchema;
       if (inputSchema && inputSchema._def?.typeName === 'ZodObject') {
         const shape = inputSchema._def.shape();
 
         for (const [paramName, paramSchema] of Object.entries(shape)) {
-          const isRequired = !((paramSchema as any)._def?.typeName === 'ZodOptional');
+          const typedSchema = paramSchema as ZodTypeAny;
+          const isRequired = !(typedSchema._def?.typeName === 'ZodOptional');
 
-          metadata.parameters.push(extractZodSchemaInfo(paramSchema as any, paramName, isRequired));
+          metadata.parameters.push(extractZodSchemaInfo(typedSchema, paramName, isRequired));
         }
       }
 
@@ -143,7 +146,7 @@ export function getToolMetadata(toolName: string): ToolMetadata | undefined {
  */
 export function validateToolArguments(
   toolName: string,
-  args: any,
+  args: unknown,
 ): { valid: boolean; errors: string[] } {
   try {
     const tool = availableTools[toolName as keyof typeof availableTools];
@@ -151,7 +154,7 @@ export function validateToolArguments(
       return { valid: false, errors: [`Tool ${toolName} not found`] };
     }
 
-    const inputSchema = (tool as any).inputSchema;
+    const inputSchema = (tool as { inputSchema?: ZodTypeAny }).inputSchema;
     if (inputSchema) {
       inputSchema.parse(args);
     }

@@ -27,9 +27,8 @@ jobs:
     - name: Install dependencies
       run: pnpm install
     
-    # TODO: fix first
-    # - name: Lint
-    #   run: pnpm lint
+    - name: Lint
+      run: pnpm lint
       
     - name: Type check
       run: pnpm typecheck
@@ -38,7 +37,7 @@ jobs:
       run: pnpm test:ci
       
     - name: Install Playwright browsers
-      run: pnpm exec playwright install --with-deps
+      run: pnpm exec playwright install chromium --with-deps
       
     - name: Run E2E tests (skip LLM-dependent tests)
       run: pnpm test:e2e

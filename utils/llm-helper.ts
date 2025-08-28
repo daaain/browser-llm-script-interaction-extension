@@ -127,56 +127,44 @@ export function createLLMHelper(): LLMHelperInterface {
 
   // Helper function to truncate text
   function truncate(text: string, maxLength: number): string {
-    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   }
 
   // Helper function to score elements based on where the pattern matches
   function scoreElement(element: Element, pattern: RegExp): number {
     let score = 0;
-    
+
     // Highest priority: matches in visible text content
     const textContent = getElementText(element);
     if (pattern.test(textContent)) {
       score += 100;
     }
-    
+
     // High priority: matches in form values or placeholders
     if (element instanceof HTMLInputElement) {
       if (pattern.test(element.value || '')) score += 90;
       if (pattern.test(element.placeholder || '')) score += 80;
     }
-    
+
     // Medium priority: matches in accessibility attributes
     const ariaLabel = element.getAttribute('aria-label') || '';
     const title = element.getAttribute('title') || '';
     const alt = element.getAttribute('alt') || '';
-    
+
     if (pattern.test(ariaLabel)) score += 70;
     if (pattern.test(title)) score += 60;
     if (pattern.test(alt)) score += 60;
-    
-    // Lower priority: matches elsewhere in outerHTML
-    if (score === 0 && pattern.test(element.outerHTML)) {
-      score += 10;
-    }
-    
-    // Bonus for interactive elements
-    if (element.tagName.toLowerCase() === 'button' || 
-        element.tagName.toLowerCase() === 'a' ||
-        element.getAttribute('role') === 'button') {
-      score += 5;
-    }
-    
+
     return score;
   }
-  
+
   // Helper function to remove duplicate nested elements
   function deduplicateElements(elements: Element[]): Element[] {
     const result: Element[] = [];
-    
+
     for (const element of elements) {
       let shouldInclude = true;
-      
+
       // Check if this element is contained within any element already in results
       for (const existing of result) {
         if (existing.contains(element)) {
@@ -189,12 +177,12 @@ export function createLLMHelper(): LLMHelperInterface {
           result.splice(index, 1);
         }
       }
-      
+
       if (shouldInclude) {
         result.push(element);
       }
     }
-    
+
     return result;
   }
 
@@ -288,14 +276,14 @@ export function createLLMHelper(): LLMHelperInterface {
         const scoredElements = Array.from(candidates)
           .map((el) => ({
             element: el,
-            score: scoreElement(el, regex)
+            score: scoreElement(el, regex),
           }))
           .filter(({ score, element }) => {
             const isVisibleElement = !options.visible || isVisible(element);
             return score > 0 && isVisibleElement;
           })
           .sort((a, b) => b.score - a.score); // Sort by score descending
-        
+
         // Deduplicate nested elements and get final list
         const preliminaryElements = scoredElements.map(({ element }) => element);
         const matchingElements = deduplicateElements(preliminaryElements);
@@ -386,7 +374,7 @@ export function createLLMHelper(): LLMHelperInterface {
 
         element.dispatchEvent(clickEvent);
 
-        const elementInfo = `${element.tagName.toLowerCase()}${element.id ? '#' + element.id : ''}${element.className ? '.' + element.className.split(' ').slice(0, 2).join('.') : ''}`;
+        const elementInfo = `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${element.className ? `.${element.className.split(' ').slice(0, 2).join('.')}` : ''}`;
         const result = `Clicked ${elementInfo}`;
         debugLog('click() result', result);
         return result;
@@ -461,7 +449,7 @@ export function createLLMHelper(): LLMHelperInterface {
           return `Element is not typeable: ${element.tagName.toLowerCase()}`;
         }
 
-        const elementInfo = `${element.tagName.toLowerCase()}${element.id ? '#' + element.id : ''}${element.className ? '.' + element.className.split(' ').slice(0, 2).join('.') : ''}`;
+        const elementInfo = `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${element.className ? `.${element.className.split(' ').slice(0, 2).join('.')}` : ''}`;
         const enterInfo = options?.pressEnter ? ' and pressed Enter' : '';
         const result = `Typed "${text}" into ${elementInfo}${enterInfo}`;
         debugLog('type() result', result);
@@ -520,6 +508,7 @@ export function createLLMHelper(): LLMHelperInterface {
 
         const textNodes: string[] = [];
         let node: Node | null;
+        // biome-ignore lint/suspicious/noAssignInExpressions: this is a simple loop
         while ((node = walker.nextNode())) {
           const text = node.textContent?.trim();
           if (text) {
@@ -592,7 +581,7 @@ export function createLLMHelper(): LLMHelperInterface {
           if (response && (response as any).success) {
             debugLog(
               'screenshot() successful',
-              (response as any).dataUrl?.substring(0, 50) + '...',
+              `${(response as any).dataUrl?.substring(0, 50)}...`,
             );
             return (response as any).dataUrl;
           } else {
