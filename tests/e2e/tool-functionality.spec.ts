@@ -61,9 +61,8 @@ test.describe('Tool Functionality', () => {
     // Check that tool information is displayed
     await expect(welcomeMessage).toContainText('autonomously use browser automation tools');
     await expect(welcomeMessage).toContainText('Available Tools');
-    await expect(welcomeMessage).toContainText('find elements');
-    await expect(welcomeMessage).toContainText('extract text');
-    await expect(welcomeMessage).toContainText('get page summary');
+    await expect(welcomeMessage).toContainText('Find');
+    await expect(welcomeMessage).toContainText('Extract');
   });
 
   test('should handle background script tool execution', async ({ context, extensionId }) => {

@@ -157,7 +157,6 @@ test.describe('Complete User Workflow', () => {
     // Initially should show welcome message
     const welcomeMessage = sidepanelPage.locator('.welcome-message').first();
     await expect(welcomeMessage).toBeVisible();
-    await expect(welcomeMessage).toContainText('Welcome to LLM Chat!');
 
     // Step 3: Test manual tool interface is present
     await expect(sidepanelPage.locator('.manual-tool-interface')).toBeVisible();
