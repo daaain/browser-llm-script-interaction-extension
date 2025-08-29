@@ -5,6 +5,7 @@ Roadmap / TODO:
 - recursive LLM scripting: have an LLM generate saveable scripts that can also call an LLM, so incorporating the alt text generator as an example would be perfect
 - see chat history
 - share / export individual chats
+- debug log needs to be saved in the background like chat history are currently the entries get lost if there's a navigation event
 - save complex function call sequence into action scripts
 - remove disable tool usage setting, not worth trying to support that use case
 - customisable system prompt

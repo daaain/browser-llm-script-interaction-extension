@@ -2,6 +2,8 @@
 
 **Fair warning: this is currently an early prototype and it's not published as a properly built extension yet, but I'm sharing this early build as it's already working as a proof-of-concept when running in development. Chrome only for now.**
 
+**Security notice: There's currently no specific prompt injection attack mitigation implemented. The extension doesn't automatically read all content of websites, only in small bits through tool calls. So it starts out with absolutely no information on what you have open and will explore based on your instructions. DO NOT use it in your main browser with logged in sessions, please only test in a separate installation like Chrome Canary. For more information why is this a serious concern, read [Simon Willison's blog post summing up Anthropic's research](https://simonwillison.net/2025/Aug/26/piloting-claude-for-chrome/).**
+
 A cross-browser extension that provides a simple chat interface for LLMs (including local models) to interact with web pages.
 
 Real-time demo using qwen/qwen3-coder-30b MLX 6bit running on an M2 Max MBP:
