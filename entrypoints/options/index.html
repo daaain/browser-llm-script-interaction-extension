@@ -50,7 +50,7 @@
         <div class="form-group">
           <label for="truncation-limit-input">Response Truncation Limit (characters):</label>
           <input type="number" id="truncation-limit-input" min="100" step="100" placeholder="2000">
-          <p class="help-text">Maximum length of LLM responses before truncation. Helps prevent context overflow. Default: 2000 characters.</p>
+          <p class="help-text">Maximum length of tool responses before truncation. Helps prevent context overflow. Default: 2000 characters.</p>
         </div>
       </section>
 
@@ -61,7 +61,7 @@
             <input type="checkbox" id="tools-enabled">
             <span>Enable automatic tool use</span>
           </label>
-          <p class="help-text">When enabled, the LLM can autonomously call browser automation tools like find(), extract(), summary(), describe(), and clear() to help with your requests.</p>
+          <p class="help-text">When enabled, the LLM can autonomously call browser automation tools like find(), extract(), summary(), describe(), etc to help with your requests.</p>
         </div>
         <div class="form-group">
           <label class="checkbox-label">

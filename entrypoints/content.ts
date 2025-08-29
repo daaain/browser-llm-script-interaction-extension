@@ -60,7 +60,7 @@ export default defineContentScript({
                 break;
               case 'click':
                 result = LLMHelper.click(
-                  validateStringArg(args.selector, 'selector'),
+                  validateOptionalStringArg(args.selector, 'selector'),
                   validateOptionalStringArg(args.text, 'text'),
                 );
                 break;
