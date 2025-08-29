@@ -1,4 +1,4 @@
-# Browser LLM Chat Extension
+# Browser LLM Action Extension
 
 **Fair warning: this is currently an early prototype and it's not published as a properly built extension yet, but I'm sharing this early build as it's already working as a proof-of-concept when running in development. Chrome only for now.**
 
@@ -28,41 +28,12 @@ If you want to see a quick demo, go to Google.com and type `click Reject All, se
 
 ### Chrome Installation
 
-1. **Build the extension**:
+```sh
+pnpm install
+pnpm dev:chrome
+```
 
-   ```bash
-   pnpm build:chrome
-   ```
-
-2. **Load in Chrome**:
-   - Open Chrome and navigate to `chrome://extensions/`
-   - Enable "Developer mode" (toggle in top-right)
-   - Click "Load unpacked"
-   - Select the `.output/chrome-mv3` folder
-   - The extension should now appear in your extensions list
-
-3. **Access the extension**:
-   - Click the extension icon in the toolbar to open the sidepanel
-   - Or right-click the extension icon → Options to configure
-
-### Firefox Installation
-
-1. **Build the extension**:
-
-   ```bash
-   pnpm build:firefox
-   ```
-
-2. **Load in Firefox**:
-   - Open Firefox and navigate to `about:debugging`
-   - Click "This Firefox"
-   - Click "Load Temporary Add-on..."
-   - Navigate to the `.output/firefox-mv2` folder and select `manifest.json`
-   - The extension should now appear in your add-ons list
-
-3. **Access the extension**:
-   - Click the extension icon in the toolbar to open the sidepanel
-   - Or go to Add-ons Manager → Extensions to configure
+This should install dependencies, build the extension, and launch Chrome in extension development mode.
 
 ## Configuration
 
@@ -72,24 +43,24 @@ If you want to see a quick demo, go to Google.com and type `click Reject All, se
    - Click the gear icon (⚙️) in the extension sidepanel
    - Or right-click the extension icon → Options
 
-2. **Configure LM Studio** (recommended for local models):
-   - Select "LM Studio" from the provider dropdown
-   - Endpoint: `http://localhost:1234/v1/chat/completions` (default)
-   - Model: Enter any name (e.g., "local-model")
-   - API Key: Leave blank
-   - Click "Test Connection" to verify
-   - Click "Save Settings"
-
-3. **Start LM Studio**:
+2. **Start LM Studio**:
    - Launch LM Studio application
    - Load a chat model
    - Go to Developer tab
    - Start the local server (should show green indicator)
 
+3. **Configure LM Studio** (recommended for local models):
+   - Select "LM Studio" from the provider dropdown
+   - Endpoint: `http://localhost:1234/v1/chat/completions` (default)
+   - Model: Enter model API identifier (e.g., "qwen/qwen3-coder-30b")
+   - API Key: Leave blank
+   - Click "Test Connection" to verify
+   - Click "Save Settings"
+
 4. **Start Chatting**:
    - Open the extension sidepanel
    - Type your message and press Enter
-   - The extension will communicate with your local LLM
+   - The extension will communicate with your local LLM and interact with the open tab (each tab will have its own session)
 
 ### Alternative Providers
 
@@ -111,7 +82,7 @@ For development setup, testing, and contribution guidelines, see [DEVELOPMENT.md
 
 ## API Compatibility
 
-The extension uses OpenAI-compatible chat completions API format, supporting:
+The extension uses Vercel AI SDK and currently implements OpenAI-compatible chat completions API format, supporting:
 
 - OpenAI API
 - LM Studio local server
@@ -119,4 +90,4 @@ The extension uses OpenAI-compatible chat completions API format, supporting:
 
 ## License
 
-ISC
+MIT
