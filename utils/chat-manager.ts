@@ -33,9 +33,14 @@ export class ChatManager {
    * Send a chat message
    */
   async sendChatMessage(message: string, tabId?: number): Promise<string> {
-    backgroundLogger.info('ChatManager.sendChatMessage called', {
-      message: message.substring(0, 50),
+    const operationId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+
+    backgroundLogger.info('Chat message operation started', {
+      operationId,
+      messageLength: message.length,
       tabId,
+      hasTabId: !!tabId,
     });
 
     try {
@@ -60,13 +65,15 @@ export class ChatManager {
       // Get conversation history
       const conversationHistory = await settingsManager.getTabConversation(tabId);
       const messagesForAPI = [...conversationHistory, newUserMessage];
+      const conversationId = tabId ? `tab-${tabId}` : 'global';
 
-      backgroundLogger.debug('📤 Messages for API', {
-        messageCount: messagesForAPI.length,
-        messages: messagesForAPI.map((m) => ({ role: m.role, contentType: typeof m.content })),
+      backgroundLogger.debug('Conversation loaded', {
+        operationId,
+        conversationId,
+        historyLength: conversationHistory.length,
+        totalMessages: messagesForAPI.length,
+        isNewConversation: conversationHistory.length === 0,
       });
-
-      backgroundLogger.info(`📤 Sending message`, { messageCount: messagesForAPI.length });
 
       // Create initial streaming message
       const streamingMessageId = `streaming-${Date.now()}`;
@@ -95,20 +102,9 @@ export class ChatManager {
       ) => {
         if (typeof textOrUIMessage === 'string') {
           // Handle text streaming
-          backgroundLogger.debug('🎯 Streaming text chunk', {
-            text: textOrUIMessage.substring(0, 100) + (textOrUIMessage.length > 100 ? '...' : ''),
-          });
-
           streamingMessage.content = textOrUIMessage;
         } else {
           // Handle UI message with parts (tool streaming)
-          backgroundLogger.debug('🎯 Streaming UI message', {
-            partsCount: textOrUIMessage.parts?.length || 0,
-            text:
-              textOrUIMessage.text?.substring(0, 100) +
-              (textOrUIMessage.text && textOrUIMessage.text.length > 100 ? '...' : ''),
-          });
-
           (streamingMessage as any).parts = textOrUIMessage.parts;
           streamingMessage.content = textOrUIMessage.text || '';
         }
@@ -183,9 +179,13 @@ export class ChatManager {
       };
 
       // Start streaming
-      backgroundLogger.info('About to call llmService.streamMessage', {
+      backgroundLogger.info('Starting LLM service stream', {
+        operationId,
+        conversationId,
         messageCount: messagesForAPI.length,
         toolsEnabled: settings.toolsEnabled,
+        provider: settings.provider.name,
+        model: settings.provider.model,
       });
       await this.llmService?.streamMessage(
         messagesForAPI,
@@ -198,12 +198,26 @@ export class ChatManager {
           screenshotToolEnabled: settings.screenshotToolEnabled,
         },
       );
-      backgroundLogger.info('llmService.streamMessage completed');
+      const duration = Date.now() - startTime;
+      backgroundLogger.info('Chat message operation completed', {
+        operationId,
+        conversationId,
+        duration,
+        responseLength: finalContent.length,
+        conversationLength: currentConversation.length,
+        tabId,
+      });
 
       return finalContent;
     } catch (error) {
-      backgroundLogger.error('Exception in ChatManager.sendChatMessage', {
+      const duration = Date.now() - startTime;
+      backgroundLogger.error('Chat message operation failed', {
+        operationId,
+        conversationId: tabId ? `tab-${tabId}` : 'global',
+        duration,
         error: error instanceof Error ? error.message : error,
+        messageLength: message.length,
+        tabId,
       });
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 

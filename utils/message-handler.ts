@@ -26,8 +26,12 @@ export class MessageHandler {
     message: unknown,
     sendResponse: (response: MessageToSidebar) => void,
   ): Promise<void> {
+    const operationId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     try {
-      console.log('📨 AISDKMessageHandler.handleMessage called with:', message);
+      backgroundLogger.info('Message handler operation started', {
+        operationId,
+        messageType: typeof message,
+      });
 
       if (!isMessageFromSidebar(message)) {
         this.sendErrorResponse(sendResponse, 'Invalid message format');
@@ -35,11 +39,11 @@ export class MessageHandler {
       }
 
       const msg = message;
-      console.log('📍 Message type:', msg.type);
+      backgroundLogger.debug('Processing message', { operationId, messageType: msg.type });
 
       switch (msg.type) {
         case 'GET_SETTINGS':
-          await this.handleGetSettings(sendResponse);
+          await this.handleGetSettings(operationId, sendResponse);
           break;
 
         case 'SAVE_SETTINGS':
@@ -78,11 +82,17 @@ export class MessageHandler {
           break;
 
         default:
-          console.error('Unknown message type:', (msg as any).type);
+          backgroundLogger.error('Unknown message type', {
+            operationId,
+            messageType: (msg as any).type,
+          });
           this.sendErrorResponse(sendResponse, 'Unknown message type');
       }
     } catch (error) {
-      console.error('Message handler error:', error);
+      backgroundLogger.error('Message handler operation failed', {
+        operationId,
+        error: error instanceof Error ? error.message : error,
+      });
       this.sendErrorResponse(
         sendResponse,
         error instanceof Error ? error.message : 'Unknown error occurred',
@@ -91,16 +101,20 @@ export class MessageHandler {
   }
 
   private async handleGetSettings(
+    operationId: string,
     sendResponse: (response: MessageToSidebar) => void,
   ): Promise<void> {
-    console.log('Processing GET_SETTINGS request');
+    backgroundLogger.debug('Processing GET_SETTINGS request', { operationId });
     const settings = await settingsManager.getSettings();
 
     const response: MessageToSidebar = {
       type: 'SETTINGS_RESPONSE',
       payload: settings,
     };
-    console.log('Sending settings response:', response);
+    backgroundLogger.debug('Sending settings response', {
+      operationId,
+      hasProvider: !!(response.payload as any)?.provider,
+    });
     sendResponse(response);
   }
 
@@ -125,16 +139,22 @@ export class MessageHandler {
     tabId: number | undefined,
     sendResponse: (response: MessageToSidebar) => void,
   ): Promise<void> {
-    console.log('💬 AISDKMessageHandler.handleSendMessage called with:', { message, tabId });
+    const sendMessageOperationId = `send-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    backgroundLogger.info('Send message operation started', {
+      operationId: sendMessageOperationId,
+      messageLength: message.length,
+      tabId,
+    });
 
     try {
       let responseContent: string;
 
-      console.log('🤖 Using chat manager');
+      backgroundLogger.debug('Delegating to chat manager', { operationId: sendMessageOperationId });
       responseContent = await chatManager.sendChatMessage(message, tabId);
 
-      console.log('✅ Chat manager returned:', {
-        responseContent: `${responseContent.substring(0, 100)}...`,
+      backgroundLogger.info('Chat manager completed', {
+        operationId: sendMessageOperationId,
+        responseLength: responseContent.length,
       });
 
       const response: MessageToSidebar = {
@@ -142,10 +162,17 @@ export class MessageHandler {
         payload: { content: responseContent },
       };
 
-      console.log('📤 Sending response back to sidebar');
+      backgroundLogger.debug('Sending response to sidebar', {
+        operationId: sendMessageOperationId,
+      });
       sendResponse(response);
     } catch (error) {
-      console.error('Error in handleSendMessage:', error);
+      backgroundLogger.error('Send message operation failed', {
+        operationId: sendMessageOperationId,
+        error: error instanceof Error ? error.message : error,
+        messageLength: message.length,
+        tabId,
+      });
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
       const response: MessageToSidebar = {
@@ -188,7 +215,9 @@ export class MessageHandler {
         payload: { success: true, dataUrl },
       });
     } catch (error) {
-      console.error('Screenshot capture error:', error);
+      backgroundLogger.error('Screenshot capture failed', {
+        error: error instanceof Error ? error.message : error,
+      });
       sendResponse({
         type: 'ERROR',
         payload: {
