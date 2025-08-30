@@ -1,4 +1,5 @@
 import browser from 'webextension-polyfill';
+import { contentLogger } from './debug-logger';
 
 export interface LLMHelperInterface {
   find(
@@ -47,14 +48,10 @@ export function createLLMHelper(): LLMHelperInterface {
   let debugMode = false;
   let lastKnownDebugMode: boolean | null = null;
 
-  // Debug logging helper
+  // Debug logging helper - now uses persistent storage
   function debugLog(message: string, data?: any) {
     if (debugMode) {
-      if (data !== undefined) {
-        console.log(`[LLMHelper Debug] ${message}`, data);
-      } else {
-        console.log(`[LLMHelper Debug] ${message}`);
-      }
+      contentLogger.debug(`[LLMHelper] ${message}`, data);
     }
   }
 
@@ -216,16 +213,14 @@ export function createLLMHelper(): LLMHelperInterface {
 
       // Only log when debug mode actually changes
       if (lastKnownDebugMode !== newDebugMode) {
-        console.log(
-          `[LLMHelper] Debug mode changed from "${lastKnownDebugMode}" to "${newDebugMode}"`,
-        );
+        contentLogger.info(`Debug mode changed from "${lastKnownDebugMode}" to "${newDebugMode}"`);
         debugMode = newDebugMode;
         lastKnownDebugMode = newDebugMode;
       } else {
         debugMode = newDebugMode;
       }
     } catch (error) {
-      console.error('Error getting settings:', error);
+      contentLogger.error('Error getting settings:', error);
     }
   }
 
@@ -260,8 +255,15 @@ export function createLLMHelper(): LLMHelperInterface {
       total: number;
       hasMore: boolean;
     } {
+      const operationId = `find-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
       try {
-        debugLog('find() called', { pattern, options });
+        contentLogger.info('Tool execution: find started', {
+          operationId,
+          pattern,
+          options,
+        });
 
         const regex = new RegExp(pattern, 'i');
         const selectorQuery =
@@ -305,10 +307,25 @@ export function createLLMHelper(): LLMHelperInterface {
           hasMore: offset + limit < total,
         };
 
-        debugLog(`find() returning ${paginatedElements.length} of ${total} total elements`, result);
+        const duration = Date.now() - startTime;
+        contentLogger.info('Tool execution: find completed', {
+          operationId,
+          duration,
+          elementsFound: total,
+          elementsReturned: paginatedElements.length,
+          hasMore: offset + limit < total,
+          result,
+        });
         return result;
       } catch (error) {
-        console.error('LLMHelper.find error:', error);
+        const duration = Date.now() - startTime;
+        contentLogger.error('Tool execution: find failed', {
+          operationId,
+          duration,
+          pattern,
+          options,
+          error: error instanceof Error ? error.message : error,
+        });
         return { elements: [], total: 0, hasMore: false };
       }
     },
@@ -318,8 +335,15 @@ export function createLLMHelper(): LLMHelperInterface {
       selector?: string,
       text?: string,
     ): string | { elements: any[]; total: number; searchText: string; action: string } {
+      const operationId = `click-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
       try {
-        debugLog('click() called', { selector, text });
+        contentLogger.info('Tool execution: click started', {
+          operationId,
+          selector,
+          text,
+        });
 
         let element: Element | null = null;
 
@@ -376,10 +400,29 @@ export function createLLMHelper(): LLMHelperInterface {
 
         const elementInfo = `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${element.className ? `.${element.className.split(' ').slice(0, 2).join('.')}` : ''}`;
         const result = `Clicked ${elementInfo}`;
-        debugLog('click() result', result);
+        const duration = Date.now() - startTime;
+
+        contentLogger.info('Tool execution: click completed', {
+          operationId,
+          duration,
+          elementInfo,
+          clickedElement: {
+            tagName: element.tagName,
+            id: element.id || null,
+            className: element.className || null,
+          },
+          result,
+        });
         return result;
       } catch (error) {
-        console.error('LLMHelper.click error:', error);
+        const duration = Date.now() - startTime;
+        contentLogger.error('Tool execution: click failed', {
+          operationId,
+          duration,
+          selector,
+          text,
+          error: error instanceof Error ? error.message : error,
+        });
         return `Error clicking element: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
     },
@@ -394,8 +437,16 @@ export function createLLMHelper(): LLMHelperInterface {
         pressEnter?: boolean;
       },
     ): string {
+      const operationId = `type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
       try {
-        debugLog('type() called', { selector, text, options });
+        contentLogger.info('Tool execution: type started', {
+          operationId,
+          selector,
+          text,
+          options,
+        });
 
         const element = document.querySelector(selector);
         if (!element) {
@@ -452,18 +503,48 @@ export function createLLMHelper(): LLMHelperInterface {
         const elementInfo = `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${element.className ? `.${element.className.split(' ').slice(0, 2).join('.')}` : ''}`;
         const enterInfo = options?.pressEnter ? ' and pressed Enter' : '';
         const result = `Typed "${text}" into ${elementInfo}${enterInfo}`;
-        debugLog('type() result', result);
+        const duration = Date.now() - startTime;
+
+        contentLogger.info('Tool execution: type completed', {
+          operationId,
+          duration,
+          elementInfo,
+          textLength: text.length,
+          pressedEnter: options?.pressEnter || false,
+          cleared: options?.clear || false,
+          targetElement: {
+            tagName: element.tagName,
+            id: element.id || null,
+            className: element.className || null,
+          },
+          result,
+        });
         return result;
       } catch (error) {
-        console.error('LLMHelper.type error:', error);
+        const duration = Date.now() - startTime;
+        contentLogger.error('Tool execution: type failed', {
+          operationId,
+          duration,
+          selector,
+          text: text.length > 100 ? `${text.substring(0, 100)}...` : text,
+          options,
+          error: error instanceof Error ? error.message : error,
+        });
         return `Error typing into element: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
     },
 
     // Extract text from the page or specific element
     extract(selector?: string, property?: string): string {
+      const operationId = `extract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
       try {
-        debugLog('extract() called', { selector, property });
+        contentLogger.info('Tool execution: extract started', {
+          operationId,
+          selector,
+          property,
+        });
         if (selector) {
           const element = document.querySelector(selector);
           if (!element) {
@@ -517,18 +598,37 @@ export function createLLMHelper(): LLMHelperInterface {
         }
 
         const fullText = textNodes.join('<br>');
-        debugLog(`extract() returning text (${fullText.length} chars)`);
+        const duration = Date.now() - startTime;
+
+        contentLogger.info('Tool execution: extract completed', {
+          operationId,
+          duration,
+          textLength: fullText.length,
+          nodeCount: textNodes.length,
+          selector,
+          property,
+        });
         return fullText;
       } catch (error) {
-        console.error('LLMHelper.extract error:', error);
+        const duration = Date.now() - startTime;
+        contentLogger.error('Tool execution: extract failed', {
+          operationId,
+          duration,
+          selector,
+          property,
+          error: error instanceof Error ? error.message : error,
+        });
         return 'Error extracting text';
       }
     },
 
     // Get a summary of the page
     summary(): string {
+      const operationId = `summary-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
       try {
-        debugLog('summary() called');
+        contentLogger.info('Tool execution: summary started', { operationId });
         const title = document.title;
         const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
           .map((h) => h.textContent?.trim())
@@ -561,29 +661,52 @@ export function createLLMHelper(): LLMHelperInterface {
           summary += `, ${tables} tables`;
         }
 
-        debugLog('summary() result', summary);
+        const duration = Date.now() - startTime;
+
+        contentLogger.info('Tool execution: summary completed', {
+          operationId,
+          duration,
+          pageTitle: title,
+          headingCount: headings.length,
+          linkCount: Array.from(document.querySelectorAll('a')).length,
+          formCount: Array.from(document.querySelectorAll('form')).length,
+          result: summary,
+        });
         return summary;
       } catch (error) {
-        console.error('LLMHelper.summary error:', error);
+        const duration = Date.now() - startTime;
+        contentLogger.error('Tool execution: summary failed', {
+          operationId,
+          duration,
+          error: error instanceof Error ? error.message : error,
+        });
         return 'Error generating page summary';
       }
     },
 
     // Take a screenshot of the current tab
     async screenshot(): Promise<string> {
+      const operationId = `screenshot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
       try {
-        debugLog('screenshot() called');
+        contentLogger.info('Tool execution: screenshot started', { operationId });
 
         // Send message to background script to capture screenshot
         if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
           const response = await browser.runtime.sendMessage({ type: 'CAPTURE_SCREENSHOT' });
 
           if (response && (response as any).success) {
-            debugLog(
-              'screenshot() successful',
-              `${(response as any).dataUrl?.substring(0, 50)}...`,
-            );
-            return (response as any).dataUrl;
+            const duration = Date.now() - startTime;
+            const dataUrl = (response as any).dataUrl;
+
+            contentLogger.info('Tool execution: screenshot completed', {
+              operationId,
+              duration,
+              dataUrlLength: dataUrl?.length || 0,
+              success: true,
+            });
+            return dataUrl;
           } else {
             throw new Error((response as any)?.error || 'Screenshot failed - no response');
           }
@@ -591,7 +714,12 @@ export function createLLMHelper(): LLMHelperInterface {
           throw new Error('Browser runtime not available');
         }
       } catch (error) {
-        console.error('LLMHelper.screenshot error:', error);
+        const duration = Date.now() - startTime;
+        contentLogger.error('Tool execution: screenshot failed', {
+          operationId,
+          duration,
+          error: error instanceof Error ? error.message : error,
+        });
         throw new Error(
           `Screenshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
@@ -600,7 +728,14 @@ export function createLLMHelper(): LLMHelperInterface {
 
     // Describe a specific section of the page
     describe(selector: string): string {
+      const operationId = `describe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
       try {
+        contentLogger.info('Tool execution: describe started', {
+          operationId,
+          selector,
+        });
         const element = document.querySelector(selector);
         if (!element) {
           return `No element found matching selector: ${selector}`;
@@ -633,17 +768,41 @@ export function createLLMHelper(): LLMHelperInterface {
           description += `: ${childSummary}`;
         }
 
+        const duration = Date.now() - startTime;
+
+        contentLogger.info('Tool execution: describe completed', {
+          operationId,
+          duration,
+          selector,
+          elementTag: element.tagName,
+          textLength: text.length,
+          childrenCount: children,
+          result: description,
+        });
         return description;
       } catch (error) {
-        console.error('LLMHelper.describe error:', error);
+        const duration = Date.now() - startTime;
+        contentLogger.error('Tool execution: describe failed', {
+          operationId,
+          duration,
+          selector,
+          error: error instanceof Error ? error.message : error,
+        });
         return 'Error describing element';
       }
     },
 
     // Get a page from a paginated response
     async getResponsePage(responseId: string, page: number): Promise<any> {
+      const operationId = `getResponsePage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const startTime = Date.now();
+
       try {
-        debugLog('getResponsePage() called', { responseId, page });
+        contentLogger.info('Tool execution: getResponsePage started', {
+          operationId,
+          responseId,
+          page,
+        });
 
         // Send message to background script to get the page
         if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
@@ -655,10 +814,16 @@ export function createLLMHelper(): LLMHelperInterface {
           const response = (await browser.runtime.sendMessage(message)) as any;
 
           if (response && response.type === 'RESPONSE_PAGE' && response.payload?.success) {
-            debugLog('getResponsePage() successful', {
+            const duration = Date.now() - startTime;
+
+            contentLogger.info('Tool execution: getResponsePage completed', {
+              operationId,
+              duration,
               responseId,
               page,
+              resultLength: response.payload.result?.length || 0,
               hasResult: !!response.payload.result,
+              metadata: response.payload._meta,
             });
             return {
               result: response.payload.result,
@@ -672,7 +837,14 @@ export function createLLMHelper(): LLMHelperInterface {
           throw new Error('Browser runtime not available');
         }
       } catch (error) {
-        console.error('LLMHelper.getResponsePage error:', error);
+        const duration = Date.now() - startTime;
+        contentLogger.error('Tool execution: getResponsePage failed', {
+          operationId,
+          duration,
+          responseId,
+          page,
+          error: error instanceof Error ? error.message : error,
+        });
         throw new Error(
           `Get response page failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );

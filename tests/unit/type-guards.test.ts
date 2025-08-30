@@ -56,6 +56,7 @@ describe('Type Guards', () => {
         truncationLimit: 10,
         toolsEnabled: true,
         screenshotToolEnabled: false,
+        maxLogEntries: 100000,
       };
 
       expect(isExtensionSettings(validSettings)).toBe(true);

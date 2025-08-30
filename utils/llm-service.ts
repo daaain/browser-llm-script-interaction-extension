@@ -137,20 +137,26 @@ export class LLMService {
     enableTools: boolean = false,
     toolSettings?: { toolsEnabled: boolean; screenshotToolEnabled: boolean },
   ): Promise<void> {
+    const operationId = `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+
     try {
       // Get tools based on settings
       const toolsToUse = toolSettings ? getToolsForSettings(toolSettings) : availableTools;
 
-      backgroundLogger.info('LLM Service streamMessage called', {
+      backgroundLogger.info('LLM streaming operation started', {
+        operationId,
         enableTools,
         messageCount: messages?.length,
         availableToolsCount: Object.keys(toolsToUse).length,
         toolNames: Object.keys(toolsToUse),
+        model: this.model?.modelId || 'unknown',
         toolSettings,
       });
       if (!enableTools) {
         // Simple streaming without tools
         backgroundLogger.info('Simple streaming - converting messages', {
+          operationId,
           messageCount: messages?.length || 0,
           messageType: typeof messages,
         });
@@ -159,11 +165,11 @@ export class LLMService {
           throw new Error(`messages is not an array: ${typeof messages}`);
         }
 
-        backgroundLogger.debug('Converting to UI messages...');
+        backgroundLogger.debug('Converting to UI messages', { operationId });
         const uiMessages = this.convertToUIMessages(messages);
-        backgroundLogger.debug('About to call convertToModelMessages', {
+        backgroundLogger.debug('Converting to model messages', {
+          operationId,
           uiMessageCount: uiMessages?.length,
-          uiMessages,
         });
 
         let modelMessages: ModelMessage[];
@@ -178,14 +184,18 @@ export class LLMService {
           }
 
           // Log the structure of the first message to help debug
-          backgroundLogger.debug('First UI message structure', { firstMessage: uiMessages[0] });
+          backgroundLogger.debug('First UI message structure', {
+            operationId,
+            firstMessage: uiMessages[0],
+          });
 
           modelMessages = convertToModelMessages(uiMessages);
-          backgroundLogger.debug('convertToModelMessages succeeded');
+          backgroundLogger.debug('Model message conversion succeeded', { operationId });
         } catch (convertError) {
-          backgroundLogger.error('convertToModelMessages failed', {
-            error: convertError,
-            uiMessages,
+          backgroundLogger.error('Model message conversion failed', {
+            operationId,
+            error: convertError instanceof Error ? convertError.message : convertError,
+            uiMessageCount: uiMessages?.length,
           });
           throw convertError;
         }
@@ -209,16 +219,15 @@ export class LLMService {
       }
 
       // Use AI SDK's streaming tool calling
-      backgroundLogger.info('Starting AI SDK streaming tool-enabled generation');
 
       if (!messages || !Array.isArray(messages)) {
         throw new Error(`messages is not an array: ${typeof messages}`);
       }
 
       const uiMessages = this.convertToUIMessages(messages);
-      backgroundLogger.debug('🔧 Tools: About to call convertToModelMessages', {
+      backgroundLogger.debug('Converting to model messages with tools', {
+        operationId,
         uiMessageCount: uiMessages?.length,
-        uiMessages,
       });
 
       let modelMessages: ModelMessage[];
@@ -233,16 +242,18 @@ export class LLMService {
         }
 
         // Log the structure of the first message to help debug
-        backgroundLogger.debug('🔧 Tools: First UI message structure', {
+        backgroundLogger.debug('First UI message structure with tools', {
+          operationId,
           firstMessage: uiMessages[0],
         });
 
         modelMessages = convertToModelMessages(uiMessages);
-        backgroundLogger.debug('✅ Tools: convertToModelMessages succeeded');
+        backgroundLogger.debug('Model message conversion with tools succeeded', { operationId });
       } catch (convertError) {
-        backgroundLogger.error('💥 Tools: convertToModelMessages failed', {
-          error: convertError,
-          uiMessages,
+        backgroundLogger.error('Model message conversion with tools failed', {
+          operationId,
+          error: convertError instanceof Error ? convertError.message : convertError,
+          uiMessageCount: uiMessages?.length,
         });
         throw convertError;
       }
@@ -257,16 +268,20 @@ export class LLMService {
         stopWhen: stepCountIs(50),
       });
 
-      backgroundLogger.info('AI SDK streaming started');
+      backgroundLogger.info('AI SDK streaming started', {
+        operationId,
+        toolCount: Object.keys(toolsToUse).length,
+        maxSteps: 50,
+        temperature: 0.1,
+      });
 
       // Build UI message parts as we stream
       const messageParts: Array<ExtendedPart> = [];
       let lastTextIndex = 0;
+      let previousResponseLength = 0;
 
       // Stream the full stream with all event types
       for await (const part of result.fullStream) {
-        backgroundLogger.debug('Stream part received', { type: part.type });
-
         switch (part.type) {
           case 'text-delta':
             finalText += part.text;
@@ -274,9 +289,16 @@ export class LLMService {
             break;
 
           case 'tool-call': {
-            backgroundLogger.debug('Tool call received', {
+            backgroundLogger.info('Tool call with input values', {
+              operationId,
               toolName: part.toolName,
+              toolCallId: part.toolCallId,
               input: part.input,
+              fullToolCall: {
+                name: part.toolName,
+                id: part.toolCallId,
+                parameters: part.input,
+              },
             });
 
             // Add any new text that came before this tool call
@@ -312,10 +334,26 @@ export class LLMService {
           }
 
           case 'tool-result': {
-            backgroundLogger.debug('Tool result received', {
+            const isError =
+              (part as unknown as { isError?: boolean }).isError ||
+              (part.output &&
+                typeof part.output === 'object' &&
+                'error' in part.output &&
+                !(
+                  'success' in part.output && (part.output as { success: boolean }).success === true
+                ));
+
+            backgroundLogger.info('Tool results with values', {
+              operationId,
               toolCallId: part.toolCallId,
               output: part.output,
-              isError: (part as any).isError,
+              success: !isError,
+              fullToolResult: {
+                id: part.toolCallId,
+                result: part.output,
+                isError,
+                timestamp: Date.now(),
+              },
             });
 
             // Update the tool part with result or error
@@ -326,16 +364,6 @@ export class LLMService {
             );
             if (toolResultIndex >= 0) {
               const toolPart = messageParts[toolResultIndex] as ExtendedToolCallPart;
-              // Check if this is an error result (AI SDK isError flag or error object pattern)
-              const isError =
-                (part as unknown as { isError?: boolean }).isError ||
-                (part.output &&
-                  typeof part.output === 'object' &&
-                  'error' in part.output &&
-                  !(
-                    'success' in part.output &&
-                    (part.output as { success: boolean }).success === true
-                  ));
 
               if (isError) {
                 toolPart.state = 'output-error';
@@ -374,6 +402,17 @@ export class LLMService {
               text: finalText,
             };
             onChunk(toolResultUIMessage);
+
+            // Log LLM response after each turn (tool call + result cycle) - only new text since last turn
+            const newResponseText = finalText.substring(previousResponseLength);
+            backgroundLogger.info('LLM response after turn completed', {
+              operationId,
+              turnType: 'tool-cycle',
+              responseText: newResponseText,
+              currentParts: messageParts.length,
+              lastPartType: messageParts[messageParts.length - 1]?.type,
+            });
+            previousResponseLength = finalText.length;
             break;
           }
 
@@ -393,9 +432,13 @@ export class LLMService {
         });
       }
 
-      backgroundLogger.info('AI SDK streaming completed', {
-        finalText: finalText.substring(0, 100),
+      const duration = Date.now() - startTime;
+      backgroundLogger.info('LLM streaming operation completed', {
+        operationId,
+        duration,
+        textLength: finalText.length,
         partsCount: messageParts.length,
+        toolCalls: messageParts.filter((p) => p.type === 'tool-call').length,
       });
 
       // Create a UI message structure
@@ -406,8 +449,13 @@ export class LLMService {
 
       onComplete(finalText, [], [], uiMessage);
     } catch (error) {
-      backgroundLogger.error('AI SDK streaming error', {
+      const duration = Date.now() - startTime;
+      backgroundLogger.error('LLM streaming operation failed', {
+        operationId,
+        duration,
         error: error instanceof Error ? error.message : error,
+        enableTools,
+        messageCount: messages?.length,
       });
       onError(error instanceof Error ? error.message : 'Unknown streaming error');
     }
@@ -445,7 +493,8 @@ export class LLMService {
           if (!resolved) {
             resolved = true;
             clearTimeout(timeout);
-            backgroundLogger.debug('Test connection successful', {
+            backgroundLogger.info('Test connection successful', {
+              provider: this.model?.modelId || 'unknown',
               responseLength: fullText.length,
             });
             resolve({ success: true });
@@ -456,7 +505,10 @@ export class LLMService {
           if (!resolved) {
             resolved = true;
             clearTimeout(timeout);
-            backgroundLogger.debug('Test connection failed', { error });
+            backgroundLogger.error('Test connection failed', {
+              provider: this.model?.modelId || 'unknown',
+              error,
+            });
             resolve({ success: false, error });
           }
         },

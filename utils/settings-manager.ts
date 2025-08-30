@@ -1,5 +1,6 @@
 import browser from 'webextension-polyfill';
 import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
+import { backgroundLogger } from '~/utils/debug-logger';
 import type { ChatMessage, ExtensionSettings } from '~/utils/types';
 import { DEFAULT_PROVIDERS } from '~/utils/types';
 
@@ -14,39 +15,36 @@ export class SettingsManager {
   }
 
   async getSettings(): Promise<ExtensionSettings> {
-    console.debug('Getting settings from storage...');
-
+    const operationId = `settings-get-${Date.now()}`;
     try {
       const result = await browser.storage.local.get(['settings']);
-      console.debug('Storage result:', JSON.stringify(result));
-
       if (result.settings) {
-        console.debug('Found existing settings');
         const settings = result.settings as ExtensionSettings;
         let needsUpdate = false;
 
         if (typeof settings.debugMode === 'undefined') {
           settings.debugMode = true;
           needsUpdate = true;
-          console.debug('Added missing debugMode to existing settings');
         }
 
         if (typeof settings.truncationLimit === 'undefined') {
           settings.truncationLimit = DEFAULT_TRUNCATION_LIMIT;
           needsUpdate = true;
-          console.debug('Added missing truncationLimit to existing settings');
         }
 
         if (typeof settings.toolsEnabled === 'undefined') {
           settings.toolsEnabled = true;
           needsUpdate = true;
-          console.debug('Added missing toolsEnabled to existing settings');
         }
 
         if (typeof settings.screenshotToolEnabled === 'undefined') {
           settings.screenshotToolEnabled = false;
           needsUpdate = true;
-          console.debug('Added missing screenshotToolEnabled to existing settings');
+        }
+
+        if (typeof (settings as any).maxLogEntries === 'undefined') {
+          (settings as any).maxLogEntries = 100000;
+          needsUpdate = true;
         }
 
         if (needsUpdate) {
@@ -56,7 +54,7 @@ export class SettingsManager {
         return settings;
       }
 
-      console.debug('No settings found, creating defaults');
+      backgroundLogger.info('No settings found, creating defaults', { operationId });
       const defaultSettings: ExtensionSettings = {
         provider: {
           ...DEFAULT_PROVIDERS[0],
@@ -67,25 +65,30 @@ export class SettingsManager {
         truncationLimit: DEFAULT_TRUNCATION_LIMIT,
         toolsEnabled: true,
         screenshotToolEnabled: false,
+        maxLogEntries: 100000,
       };
 
       await browser.storage.local.set({ settings: defaultSettings });
-      console.debug('Default settings saved');
+      backgroundLogger.info('Default settings created and saved', { operationId });
       return defaultSettings;
     } catch (error) {
-      console.error('Error accessing storage:', error);
+      backgroundLogger.error('Settings storage access failed', {
+        operationId,
+        error: error instanceof Error ? error.message : error,
+      });
       throw error;
     }
   }
 
   async saveSettings(settings: ExtensionSettings): Promise<void> {
-    console.debug('Saving settings:', JSON.stringify(settings));
-
+    const operationId = `settings-save-${Date.now()}`;
     try {
       await browser.storage.local.set({ settings });
-      console.debug('Settings saved successfully');
     } catch (error) {
-      console.error('Error saving settings:', error);
+      backgroundLogger.error('Settings save failed', {
+        operationId,
+        error: error instanceof Error ? error.message : error,
+      });
       throw error;
     }
   }

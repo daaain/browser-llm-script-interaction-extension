@@ -215,6 +215,7 @@ export interface ExtensionSettings {
   tabConversations?: { [tabId: string]: ChatMessage[] };
   toolsEnabled: boolean;
   screenshotToolEnabled: boolean;
+  maxLogEntries: number;
 }
 
 // Chrome-specific sidePanel API types

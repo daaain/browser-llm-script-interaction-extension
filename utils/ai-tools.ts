@@ -1,6 +1,7 @@
 import { tool } from 'ai';
 import browser from 'webextension-polyfill';
 import { z } from 'zod/v3';
+import { backgroundLogger } from './debug-logger';
 import { responseManager } from './response-manager';
 import type { ContentScriptFunctionRequest, ContentScriptFunctionResponse } from './types';
 
@@ -67,7 +68,15 @@ async function executeContentScriptFunction(
   functionName: string,
   args: any,
 ): Promise<ContentScriptFunctionResponse> {
+  const operationId = `tool-${functionName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
   try {
+    backgroundLogger.debug('Tool execution started', {
+      operationId,
+      functionName,
+      args,
+    });
+
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
     const activeTab = tabs[0];
 
@@ -84,18 +93,44 @@ async function executeContentScriptFunction(
       arguments: convertedArgs,
     };
 
+    backgroundLogger.debug('Sending message to content script', {
+      operationId,
+      tabId: activeTab.id,
+      message,
+    });
+
     const response = (await browser.tabs.sendMessage(
       activeTab.id,
       message,
     )) as ContentScriptFunctionResponse;
 
     if (!response.success) {
+      backgroundLogger.error('Tool execution failed', {
+        operationId,
+        functionName,
+        error: response.error,
+      });
       throw new Error(response.error || `Failed to execute ${functionName}`);
     }
+
+    backgroundLogger.info('Tool execution completed successfully', {
+      operationId,
+      functionName,
+      hasResult: !!response.result,
+      resultType: typeof response.result,
+    });
 
     return response;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    backgroundLogger.error('Tool execution error', {
+      operationId,
+      functionName,
+      error: errorMessage,
+      args,
+    });
+
     console.error(`Error executing content script function ${functionName}:`, error);
 
     // Provide more specific error information for debugging
