@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import { testTimeouts } from './test-constants';
 import './types';
 import * as fs from 'node:fs';
 
@@ -142,35 +143,45 @@ test.describe('Manual Streaming Test', () => {
     await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
     // Wait for sidepanel to fully load
-    await expect(sidepanelPage.locator('#message-input')).toBeVisible({ timeout: 5000 });
-    await expect(sidepanelPage.locator('#send-btn')).toBeVisible({ timeout: 5000 });
+    await expect(sidepanelPage.locator('#message-input')).toBeVisible({
+      timeout: testTimeouts.SETTINGS_SAVE,
+    });
+    await expect(sidepanelPage.locator('#send-btn')).toBeVisible({
+      timeout: testTimeouts.SETTINGS_SAVE,
+    });
 
     // Debug panel removed - now relying on console logs only
     console.log('✅ Using console logs for debugging');
 
-    console.log('🚀 Starting test with network capture enabled...');
+    console.log(`[${new Date().toISOString()}] 🚀 Starting test with network capture enabled...`);
 
     // Test 1: Simple message without tools
-    console.log('📝 Test 1: Simple message without tools');
+    console.log(`[${new Date().toISOString()}] 📝 Test 1: Simple message without tools`);
     await sidepanelPage
       .locator('#message-input')
       .fill("Hello! Just say hi back briefly, don't use any tools.");
     await sidepanelPage.locator('#send-btn').click();
 
     // Wait for response
-    await expect(sidepanelPage.locator('.message.assistant')).toBeVisible({ timeout: 10000 });
+    await expect(sidepanelPage.locator('.message.assistant')).toBeVisible({
+      timeout: testTimeouts.NORMAL_STREAMING,
+    });
     await expect(sidepanelPage.locator('.message.assistant.streaming')).toHaveCount(0, {
-      timeout: 15000,
+      timeout: testTimeouts.TOOL_EXECUTION, // For slower models
     });
 
     const firstResponse = await sidepanelPage.locator('.message.assistant').textContent();
-    console.log('✅ First response received:', firstResponse?.substring(0, 100));
+    console.log(
+      `[${new Date().toISOString()}] ✅ First response received: ${firstResponse?.substring(0, 100)}`,
+    );
 
     // Take screenshot after first message
     await sidepanelPage.screenshot({ path: 'test-results/after-first-message.png' });
 
     // Test 2: Multi-turn tool calls test
-    console.log('📝 Test 2: Multi-turn tool calls test - find and analyze scenario');
+    console.log(
+      `[${new Date().toISOString()}] 📝 Test 2: Multi-turn tool calls test - find and analyze scenario`,
+    );
 
     // First, let's navigate to our local test page with interactive elements
     const testPage = await context.newPage();
@@ -191,7 +202,7 @@ test.describe('Manual Streaming Test', () => {
     // Take screenshot right after sending
     await sidepanelPage.screenshot({ path: 'test-results/after-tool-message-send.png' });
 
-    console.log('⏳ Waiting for ANY assistant message to appear...');
+    console.log(`[${new Date().toISOString()}] ⏳ Waiting for ANY assistant message to appear...`);
     // First, just wait for any assistant message to appear
     await expect(sidepanelPage.locator('.message.assistant')).toHaveCount(2, {
       timeout: 15000,
@@ -202,20 +213,28 @@ test.describe('Manual Streaming Test', () => {
 
     // Check if streaming class exists
     const streamingCount = await sidepanelPage.locator('.message.assistant.streaming').count();
-    console.log(`📊 Streaming messages found: ${streamingCount}`);
+    console.log(`[${new Date().toISOString()}] 📊 Streaming messages found: ${streamingCount}`);
 
     if (streamingCount > 0) {
-      console.log('⏳ Waiting for streaming to complete...');
+      const streamStartTime = Date.now();
+      console.log(`[${new Date().toISOString()}] ⏳ Waiting for streaming to complete...`);
       // Wait for completion with longer timeout for tool calls
       await expect(sidepanelPage.locator('.message.assistant.streaming')).toHaveCount(0, {
-        timeout: 45000,
+        timeout: testTimeouts.SLOW_MODEL_STREAMING, // For slower models like mlx-community/gpt-oss-120b
       });
+      const streamDuration = Date.now() - streamStartTime;
+      console.log(`[${new Date().toISOString()}] ✅ Streaming completed in ${streamDuration}ms`);
     } else {
-      console.log('ℹ️  No streaming detected, message may have completed immediately');
+      console.log(
+        `[${new Date().toISOString()}] ℹ️  No streaming detected, message may have completed immediately`,
+      );
     }
 
     const toolResponse = await sidepanelPage.locator('.message.assistant').last().innerHTML();
-    console.log('✅ Tool response received, length:', toolResponse.length);
+    const responseTime = Date.now();
+    console.log(
+      `[${new Date().toISOString()}] ✅ Tool response received, length: ${toolResponse.length}`,
+    );
 
     // Save the final conversation state
     const allMessages = await sidepanelPage.locator('.message').allInnerTexts();
@@ -230,7 +249,9 @@ test.describe('Manual Streaming Test', () => {
     // Save console logs
     fs.writeFileSync('test-results/console-logs.txt', consoleLogs.join('\n'));
 
-    console.log(`📊 Test completed. Captured ${apiResponses.length} API responses.`);
+    console.log(
+      `[${new Date().toISOString()}] 📊 Test completed. Captured ${apiResponses.length} API responses.`,
+    );
     console.log(`💬 Final conversation has ${allMessages.length} messages.`);
     console.log(`📋 Console logs captured: ${consoleLogs.length} entries.`);
 

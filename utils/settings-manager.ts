@@ -43,7 +43,7 @@ export class SettingsManager {
         }
 
         if (typeof (settings as any).maxLogEntries === 'undefined') {
-          (settings as any).maxLogEntries = 100000;
+          (settings as any).maxLogEntries = 10000;
           needsUpdate = true;
         }
 
@@ -65,7 +65,7 @@ export class SettingsManager {
         truncationLimit: DEFAULT_TRUNCATION_LIMIT,
         toolsEnabled: true,
         screenshotToolEnabled: false,
-        maxLogEntries: 100000,
+        maxLogEntries: 10000,
       };
 
       await browser.storage.local.set({ settings: defaultSettings });
@@ -104,7 +104,7 @@ export class SettingsManager {
         tabConversations,
       });
     } catch (error) {
-      console.error('Error updating tab conversation:', error);
+      backgroundLogger.error('Error updating tab conversation', { tabId, error });
       throw error;
     }
   }
@@ -117,7 +117,7 @@ export class SettingsManager {
         chatHistory: conversation,
       });
     } catch (error) {
-      console.error('Error updating global history:', error);
+      backgroundLogger.error('Error updating global history', { conversation, error });
       throw error;
     }
   }
@@ -140,7 +140,7 @@ export class SettingsManager {
       await this.saveSettings(settings);
       return settings;
     } catch (error) {
-      console.error('Error clearing tab conversation:', error);
+      backgroundLogger.error('Error clearing tab conversation', { tabId, error });
       throw error;
     }
   }

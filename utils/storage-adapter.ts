@@ -14,7 +14,7 @@ class ExtensionStorageAdapter<T> implements StorageAdapter<T> {
       const result = await browser.storage.local.get([key]);
       return (result[key] as T) || null;
     } catch (error) {
-      console.error('Extension storage get operation failed:', error);
+      console.error('Extension storage get operation failed', { key, error });
       return null;
     }
   }
@@ -54,7 +54,7 @@ class ExtensionStorageAdapter<T> implements StorageAdapter<T> {
       const result = await browser.storage.local.get(null);
       return Object.keys(result);
     } catch (error) {
-      console.error('Extension storage getAllKeys operation failed:', error);
+      console.error('Extension storage getAllKeys operation failed', { error });
       return [];
     }
   }
@@ -69,5 +69,5 @@ export interface LogStorageConfig {
 }
 
 export const DEFAULT_LOG_STORAGE_CONFIG: Required<LogStorageConfig> = {
-  maxLogEntries: 100000,
+  maxLogEntries: 10000,
 };

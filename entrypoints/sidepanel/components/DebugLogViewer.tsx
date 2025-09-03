@@ -19,6 +19,7 @@ interface LogFilter {
   contexts: LogEntry['context'][];
   limit: number;
   since?: number;
+  searchText?: string;
 }
 
 const DebugLogViewer: React.FC<DebugLogViewerProps> = ({ isVisible, onClose }) => {
@@ -29,6 +30,7 @@ const DebugLogViewer: React.FC<DebugLogViewerProps> = ({ isVisible, onClose }) =
     levels: ['debug', 'info', 'warn', 'error'],
     contexts: ['background', 'sidepanel', 'content', 'options'],
     limit: 200,
+    searchText: '',
   });
   const [stats, setStats] = useState<{
     total: number;
@@ -45,12 +47,28 @@ const DebugLogViewer: React.FC<DebugLogViewerProps> = ({ isVisible, onClose }) =
       const queryOptions: LogQueryOptions = {
         level: filter.levels,
         context: filter.contexts,
-        limit: filter.limit,
+        limit: filter.limit * 2, // Fetch more logs for text filtering
         since: filter.since,
       };
 
       // Use any logger instance since they all share the same storage now
-      const allLogs = await backgroundLogger.queryLogs(queryOptions);
+      let allLogs = await backgroundLogger.queryLogs(queryOptions);
+
+      // Apply text filtering if search text is provided
+      if (filter.searchText?.trim()) {
+        const searchTerm = filter.searchText.toLowerCase().trim();
+        allLogs = allLogs.filter(
+          (log) =>
+            log.message.toLowerCase().includes(searchTerm) ||
+            (log.data && JSON.stringify(log.data).toLowerCase().includes(searchTerm)),
+        );
+      }
+
+      // Limit the results after text filtering
+      if (allLogs.length > filter.limit) {
+        allLogs = allLogs.slice(0, filter.limit);
+      }
+
       setLogs(allLogs);
 
       // Get stats from the shared storage
@@ -123,89 +141,24 @@ const DebugLogViewer: React.FC<DebugLogViewerProps> = ({ isVisible, onClose }) =
     URL.revokeObjectURL(url);
   };
 
-  const getLevelColor = (level: LogEntry['level']) => {
-    switch (level) {
-      case 'debug':
-        return '#6b7280';
-      case 'info':
-        return '#3b82f6';
-      case 'warn':
-        return '#f59e0b';
-      case 'error':
-        return '#ef4444';
-    }
-  };
-
-  const getContextColor = (context: LogEntry['context']) => {
-    switch (context) {
-      case 'background':
-        return '#8b5cf6';
-      case 'sidepanel':
-        return '#06b6d4';
-      case 'content':
-        return '#10b981';
-      case 'options':
-        return '#f97316';
-    }
-  };
-
   if (!isVisible) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
-        zIndex: 9999,
-        padding: '20px',
-        color: 'white',
-        fontFamily: 'monospace',
-        fontSize: '12px',
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: '#1f2937',
-          borderRadius: '8px',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
+    <div className="debug-overlay">
+      <div className="debug-container">
         {/* Header */}
-        <div
-          style={{
-            padding: '16px',
-            borderBottom: '1px solid #374151',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <h3 style={{ margin: 0, color: '#f3f4f6' }}>Debug Logs</h3>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="debug-viewer-header">
+          <h3 className="debug-title">Debug Logs</h3>
+          <div className="debug-header-controls">
             {stats && (
-              <span style={{ color: '#9ca3af', fontSize: '11px' }}>
+              <span className="debug-stats">
                 Total: {stats.total} | Errors: {stats.byLevel.error} | Warns: {stats.byLevel.warn}
               </span>
             )}
             <button
               type="button"
               onClick={() => setAutoRefresh(!autoRefresh)}
-              style={{
-                background: autoRefresh ? '#10b981' : '#374151',
-                color: 'white',
-                border: 'none',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
+              className={`debug-toggle-btn ${autoRefresh ? '' : 'off'}`}
             >
               Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
             </button>
@@ -213,147 +166,71 @@ const DebugLogViewer: React.FC<DebugLogViewerProps> = ({ isVisible, onClose }) =
               type="button"
               onClick={loadLogs}
               disabled={loading}
-              style={{
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                cursor: 'pointer',
-                opacity: loading ? 0.5 : 1,
-              }}
+              className="debug-action-btn"
             >
               {loading ? 'Loading...' : 'Refresh'}
             </button>
-            <button
-              type="button"
-              onClick={exportLogs}
-              style={{
-                background: '#6b7280',
-                color: 'white',
-                border: 'none',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-            >
+            <button type="button" onClick={exportLogs} className="debug-action-btn export">
               Export
             </button>
-            <button
-              type="button"
-              onClick={clearAllLogs}
-              style={{
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-            >
+            <button type="button" onClick={clearAllLogs} className="debug-action-btn clear">
               Clear
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: '#374151',
-                color: 'white',
-                border: 'none',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-            >
+            <button type="button" onClick={onClose} className="debug-action-btn close">
               Close
             </button>
           </div>
         </div>
 
         {/* Filters */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #374151',
-            display: 'flex',
-            gap: '16px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <span style={{ color: '#d1d5db', marginRight: '8px', fontSize: '11px' }}>Levels:</span>
+        <div className="debug-filters">
+          <div className="debug-filter-group">
+            <span className="debug-filter-label">Search:</span>
+            <input
+              type="text"
+              value={filter.searchText || ''}
+              onChange={(e) => setFilter((prev) => ({ ...prev, searchText: e.target.value }))}
+              placeholder="Filter by message content..."
+              className="debug-search-input"
+            />
+          </div>
+          <div className="debug-filter-group">
+            <span className="debug-filter-label">Levels:</span>
             {(['debug', 'info', 'warn', 'error'] as const).map((level) => (
               <button
                 key={level}
                 type="button"
                 onClick={() => handleLevelToggle(level)}
-                style={{
-                  background: filter.levels.includes(level) ? getLevelColor(level) : '#374151',
-                  color: 'white',
-                  border: 'none',
-                  padding: '2px 6px',
-                  margin: '0 2px',
-                  borderRadius: '3px',
-                  fontSize: '10px',
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                }}
+                className={`debug-level-btn ${filter.levels.includes(level) ? `active-${level}` : ''}`}
               >
                 {level}
               </button>
             ))}
           </div>
 
-          <div>
-            <span style={{ color: '#d1d5db', marginRight: '8px', fontSize: '11px' }}>
-              Contexts:
-            </span>
+          <div className="debug-filter-group">
+            <span className="debug-filter-label">Contexts:</span>
             {(['background', 'sidepanel', 'content', 'options'] as const).map((context) => (
               <button
                 key={context}
                 type="button"
                 onClick={() => handleContextToggle(context)}
-                style={{
-                  background: filter.contexts.includes(context)
-                    ? getContextColor(context)
-                    : '#374151',
-                  color: 'white',
-                  border: 'none',
-                  padding: '2px 6px',
-                  margin: '0 2px',
-                  borderRadius: '3px',
-                  fontSize: '10px',
-                  cursor: 'pointer',
-                }}
+                className={`debug-context-btn ${filter.contexts.includes(context) ? `active-${context}` : ''}`}
               >
                 {context}
               </button>
             ))}
           </div>
 
-          <div>
-            <label
-              htmlFor={selectId}
-              style={{ color: '#d1d5db', marginRight: '8px', fontSize: '11px' }}
-            >
+          <div className="debug-filter-group">
+            <label htmlFor={selectId} className="debug-filter-label">
               Limit:
             </label>
             <select
               id={selectId}
               value={filter.limit}
               onChange={(e) => setFilter((prev) => ({ ...prev, limit: Number(e.target.value) }))}
-              style={{
-                background: '#374151',
-                color: 'white',
-                border: '1px solid #6b7280',
-                borderRadius: '3px',
-                fontSize: '11px',
-                padding: '2px 4px',
-              }}
+              className="debug-select"
             >
               <option value={50}>50</option>
               <option value={100}>100</option>
@@ -365,102 +242,27 @@ const DebugLogViewer: React.FC<DebugLogViewerProps> = ({ isVisible, onClose }) =
         </div>
 
         {/* Log entries */}
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: '8px',
-          }}
-        >
-          {loading && (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af' }}>
-              Loading logs...
-            </div>
-          )}
+        <div className="debug-logs-container">
+          {loading && <div className="debug-loading">Loading logs...</div>}
 
           {!loading && logs.length === 0 && (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af' }}>
+            <div className="debug-no-logs">
               No logs found. Try adjusting your filters or check if debug mode is enabled.
             </div>
           )}
 
           {logs.map((log) => (
-            <div
-              key={log.id}
-              style={{
-                padding: '4px 8px',
-                marginBottom: '2px',
-                borderLeft: `3px solid ${getLevelColor(log.level)}`,
-                backgroundColor:
-                  log.level === 'error' ? '#fee2e2' : log.level === 'warn' ? '#fef3c7' : '#f9fafb',
-                color:
-                  log.level === 'error' ? '#991b1b' : log.level === 'warn' ? '#92400e' : '#111827',
-                borderRadius: '2px',
-                wordBreak: 'break-word',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '2px',
-                  fontSize: '10px',
-                  color: '#6b7280',
-                }}
-              >
+            <div key={log.id} className={`debug-log-entry ${log.level}`}>
+              <div className="debug-log-meta">
                 <span>{new Date(log.timestamp).toLocaleTimeString()}</span>
-                <span
-                  style={{
-                    background: getLevelColor(log.level),
-                    color: 'white',
-                    padding: '1px 4px',
-                    borderRadius: '2px',
-                    textTransform: 'uppercase',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  {log.level}
-                </span>
-                <span
-                  style={{
-                    background: getContextColor(log.context),
-                    color: 'white',
-                    padding: '1px 4px',
-                    borderRadius: '2px',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {log.context}
-                </span>
+                <span className={`debug-log-level ${log.level}`}>{log.level}</span>
+                <span className={`debug-log-context ${log.context}`}>{log.context}</span>
               </div>
-              <div style={{ fontSize: '11px', lineHeight: '1.4' }}>{log.message}</div>
+              <div className="debug-log-message">{log.message}</div>
               {log.data && (
-                <details style={{ marginTop: '4px' }}>
-                  <summary
-                    style={{
-                      cursor: 'pointer',
-                      fontSize: '10px',
-                      color: '#6b7280',
-                      userSelect: 'none',
-                    }}
-                  >
-                    Data
-                  </summary>
-                  <pre
-                    style={{
-                      marginTop: '4px',
-                      padding: '4px',
-                      background: '#f3f4f6',
-                      borderRadius: '2px',
-                      fontSize: '10px',
-                      overflow: 'auto',
-                      maxHeight: '200px',
-                      color: '#111827',
-                    }}
-                  >
-                    {JSON.stringify(log.data, null, 2)}
-                  </pre>
+                <details className="debug-log-data">
+                  <summary>Data</summary>
+                  <pre>{JSON.stringify(log.data, null, 2)}</pre>
                 </details>
               )}
             </div>
@@ -468,64 +270,30 @@ const DebugLogViewer: React.FC<DebugLogViewerProps> = ({ isVisible, onClose }) =
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '8px 16px',
-            borderTop: '1px solid #374151',
-            fontSize: '10px',
-            color: '#9ca3af',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+        <div className="debug-footer">
           <span>
             Showing {logs.length} logs
             {filter.since && ` since ${new Date(filter.since).toLocaleString()}`}
           </span>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="debug-footer-controls">
             <button
               type="button"
               onClick={() => setFilter((prev) => ({ ...prev, since: Date.now() - 60 * 60 * 1000 }))}
-              style={{
-                background: 'none',
-                color: '#9ca3af',
-                border: '1px solid #6b7280',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                fontSize: '10px',
-                cursor: 'pointer',
-              }}
+              className="debug-time-btn"
             >
               Last Hour
             </button>
             <button
               type="button"
               onClick={() => setFilter((prev) => ({ ...prev, since: Date.now() - 10 * 60 * 1000 }))}
-              style={{
-                background: 'none',
-                color: '#9ca3af',
-                border: '1px solid #6b7280',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                fontSize: '10px',
-                cursor: 'pointer',
-              }}
+              className="debug-time-btn"
             >
               Last 10min
             </button>
             <button
               type="button"
               onClick={() => setFilter((prev) => ({ ...prev, since: undefined }))}
-              style={{
-                background: 'none',
-                color: '#9ca3af',
-                border: '1px solid #6b7280',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                fontSize: '10px',
-                cursor: 'pointer',
-              }}
+              className="debug-time-btn"
             >
               All Time
             </button>

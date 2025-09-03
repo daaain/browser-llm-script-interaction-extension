@@ -1,5 +1,6 @@
 import browser from 'webextension-polyfill';
 import { DEFAULT_TRUNCATION_LIMIT } from '~/utils/constants';
+import { createLogger } from '~/utils/debug-logger';
 import { settingsManager } from '~/utils/settings-manager';
 
 /**
@@ -39,6 +40,7 @@ class ResponseManagerClass {
   private responseBuffer = new Map<string, BufferedResponse>();
   private currentTruncationLimit: number = DEFAULT_TRUNCATION_LIMIT;
   private maxBufferSize: number = 50; // Keep last 50 responses
+  private logger = createLogger('background');
 
   constructor() {
     this.initializeSettings();
@@ -51,8 +53,11 @@ class ResponseManagerClass {
       if (settings.truncationLimit) {
         this.currentTruncationLimit = settings.truncationLimit;
       }
-    } catch (_error) {
-      console.warn('Failed to load truncation settings, using default:', DEFAULT_TRUNCATION_LIMIT);
+    } catch (error) {
+      this.logger.warn('Failed to load truncation settings, using default', {
+        defaultLimit: DEFAULT_TRUNCATION_LIMIT,
+        error,
+      });
     }
   }
 
