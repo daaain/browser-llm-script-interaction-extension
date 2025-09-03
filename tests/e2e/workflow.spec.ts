@@ -158,11 +158,16 @@ test.describe('Complete User Workflow', () => {
     const welcomeMessage = sidepanelPage.locator('.welcome-message').first();
     await expect(welcomeMessage).toBeVisible();
 
-    // Step 3: Test manual tool interface is present
+    // Step 3: Open the manual tool interface panel
+    const toolsButton = sidepanelPage.locator('button[title="Toggle manual tools panel"]');
+    await expect(toolsButton).toBeVisible();
+    await toolsButton.click();
+
+    // Step 4: Test manual tool interface is present
     await expect(sidepanelPage.locator('.manual-tool-interface')).toBeVisible();
     await expect(sidepanelPage.locator('.tool-header h4')).toContainText('Manual Tool Testing');
 
-    // Step 4: Test tool selector is present and functional
+    // Step 5: Test tool selector is present and functional
     const toolSelect = sidepanelPage.locator('.tool-select');
     await expect(toolSelect).toBeVisible();
 
@@ -170,7 +175,7 @@ test.describe('Complete User Workflow', () => {
     const toolOptions = await toolSelect.locator('option').allTextContents();
     expect(toolOptions.length).toBeGreaterThan(1); // Should have multiple tools available
 
-    // Step 5: Test tool parameter form updates when selection changes
+    // Step 6: Test tool parameter form updates when selection changes
     await toolSelect.selectOption({ index: 1 }); // Select second tool
     await sidepanelPage.waitForTimeout(500); // Allow form to update
 

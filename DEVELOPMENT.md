@@ -276,11 +276,55 @@ Uses OpenAI chat completions format with tool support:
    - Verify temperature is set to 0.1 for consistent results
    - Tests expect multiple tool calls for comprehensive validation
 
-### Logging
+### Debug Logging System
 
-- Background script logs appear in service worker console
-- Sidepanel logs appear in sidepanel DevTools console
-- Use `console.log()` for debugging (remove in production)
+The extension features a comprehensive debug logging system that works across all contexts (background, sidepanel, content scripts, options).
+
+#### Using the Debug Logger
+
+```typescript
+// Import the logger
+import { backgroundLogger, sidepanelLogger, contentLogger, optionsLogger } from '~/utils/debug-logger';
+// Or use the context-aware logger
+import { getContextLogger } from '~/utils/debug-logger';
+
+// Use the appropriate logger for your context
+const logger = backgroundLogger; // or getContextLogger() for automatic detection
+
+// Log at different levels
+logger.debug('Debug information', { data: 'example' });
+logger.info('Information message', { userId: 123 });
+logger.warn('Warning message', { issue: 'performance' });
+logger.error('Error occurred', new Error('Something went wrong')); // Automatically captures stack traces
+```
+
+#### Viewing Debug Logs
+
+1. **In Sidepanel**: Click the debug icon (🐛) in the header to open the debug log viewer
+2. **In DevTools**: Logs also appear in the browser console for immediate debugging
+3. **Export Logs**: Use the export button in the debug viewer to save logs as JSON
+
+#### Debug Viewer Features
+
+- **Real-time filtering** by log level (debug, info, warn, error)
+- **Context filtering** by source (background, sidepanel, content, options)
+- **Text search** through log messages and data
+- **Time-based filtering** (last hour, last 10 minutes, all time)
+- **Auto-refresh** for live log monitoring
+- **Export functionality** for sharing or analysis
+
+#### Configuration
+
+- **Max Log Entries**: Configurable limit (default: 10,000 entries)
+- **Auto-pruning**: Old entries are automatically removed when limit is exceeded
+- **Persistent Storage**: Logs survive extension restarts and browser sessions
+
+#### Performance Considerations
+
+- Logs are stored efficiently using chunked storage
+- Only recent entries are kept in memory
+- Background logging has minimal performance impact
+- Type validation ensures data integrity
 
 ## Contributing
 

@@ -20,9 +20,11 @@ https://github.com/user-attachments/assets/7a584180-e8dd-4c7f-838a-efd051fa2968
 
 ## Quick Start
 
-Ready-to-use extension builds are available in the releases section. For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
+Currently there aren't ready-to-use extension builds.
 
-If you want to see a quick demo, go to Google.com and type `click Reject All, search fluffy robots, and tell me which 3 are the most popular`
+For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+Once you got the extension running, if you want to see a quick demo go to Google.com and type `click Reject All, search fluffy robots, and tell me which 3 are the most popular`
 
 ## Installation
 

@@ -53,25 +53,30 @@ ol {
   align-items: center;
 }
 
-.settings-btn,
-.clear-btn {
+.header-btn {
   background: none;
   border: none;
   color: white;
-  font-size: 1.2em;
-  cursor: pointer;
-  padding: 5px;
-  border-radius: 4px;
-  transition: background-color 0.2s ease;
-}
-
-.settings-btn:hover,
-.clear-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.clear-btn {
   font-size: 1em;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.header-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.header-btn:active {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(0);
 }
 
 .messages-container {
@@ -810,4 +815,352 @@ ol {
     padding: 8px;
     gap: 10px;
   }
+}
+
+/* Debug Log Viewer Styles */
+.debug-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  z-index: 9999;
+  padding: 20px;
+  color: white;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.debug-container {
+  background-color: #1f2937;
+  border-radius: 8px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.debug-viewer-header {
+  padding: 16px;
+  border-bottom: 1px solid #374151;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.debug-title {
+  margin: 0;
+  color: #f3f4f6;
+}
+
+.debug-header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.debug-stats {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.debug-toggle-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.debug-toggle-btn.off {
+  background: #374151;
+}
+
+.debug-action-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.debug-action-btn:disabled {
+  opacity: 0.5;
+}
+
+.debug-action-btn.export {
+  background: #6b7280;
+}
+
+.debug-action-btn.clear {
+  background: #ef4444;
+}
+
+.debug-action-btn.close {
+  background: #374151;
+}
+
+.debug-filters {
+  padding: 12px 16px;
+  border-bottom: 1px solid #374151;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.debug-filter-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.debug-filter-label {
+  color: #d1d5db;
+  font-size: 11px;
+}
+
+.debug-level-btn {
+  background: #374151;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  margin: 0 2px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.debug-level-btn.active-debug {
+  background: #6b7280;
+}
+
+.debug-level-btn.active-info {
+  background: #3b82f6;
+}
+
+.debug-level-btn.active-warn {
+  background: #f59e0b;
+}
+
+.debug-level-btn.active-error {
+  background: #ef4444;
+}
+
+.debug-context-btn {
+  background: #374151;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  margin: 0 2px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.debug-context-btn.active-background {
+  background: #8b5cf6;
+}
+
+.debug-context-btn.active-sidepanel {
+  background: #06b6d4;
+}
+
+.debug-context-btn.active-content {
+  background: #10b981;
+}
+
+.debug-context-btn.active-options {
+  background: #f97316;
+}
+
+.debug-select {
+  background: #374151;
+  color: white;
+  border: 1px solid #6b7280;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.debug-search-input {
+  background: #374151;
+  color: white;
+  border: 1px solid #6b7280;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 4px 8px;
+  min-width: 200px;
+}
+
+.debug-search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.debug-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.debug-logs-container {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.debug-loading {
+  padding: 20px;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.debug-no-logs {
+  padding: 20px;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.debug-log-entry {
+  padding: 4px 8px;
+  margin-bottom: 2px;
+  border-radius: 2px;
+  word-break: break-word;
+  color: #111827;
+  background-color: #f9fafb;
+  border-left: 3px solid #6b7280;
+}
+
+.debug-log-entry.error {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-left-color: #ef4444;
+}
+
+.debug-log-entry.warn {
+  background-color: #fef3c7;
+  color: #92400e;
+  border-left-color: #f59e0b;
+}
+
+.debug-log-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.debug-log-level {
+  background: #6b7280;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.debug-log-level.debug {
+  background: #6b7280;
+}
+
+.debug-log-level.info {
+  background: #3b82f6;
+}
+
+.debug-log-level.warn {
+  background: #f59e0b;
+}
+
+.debug-log-level.error {
+  background: #ef4444;
+}
+
+.debug-log-context {
+  background: #8b5cf6;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+.debug-log-context.background {
+  background: #8b5cf6;
+}
+
+.debug-log-context.sidepanel {
+  background: #06b6d4;
+}
+
+.debug-log-context.content {
+  background: #10b981;
+}
+
+.debug-log-context.options {
+  background: #f97316;
+}
+
+.debug-log-message {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.debug-log-data {
+  margin-top: 4px;
+}
+
+.debug-log-data summary {
+  cursor: pointer;
+  font-size: 10px;
+  color: #6b7280;
+  user-select: none;
+}
+
+.debug-log-data pre {
+  margin-top: 4px;
+  padding: 4px;
+  background: #f3f4f6;
+  border-radius: 2px;
+  font-size: 10px;
+  overflow: auto;
+  max-height: 200px;
+  color: #111827;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.debug-footer {
+  padding: 8px 16px;
+  border-top: 1px solid #374151;
+  font-size: 10px;
+  color: #9ca3af;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.debug-footer-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.debug-time-btn {
+  background: none;
+  color: #9ca3af;
+  border: 1px solid #6b7280;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.debug-time-btn:hover {
+  background: #f8f9fa;
+  color: #495057;
 }

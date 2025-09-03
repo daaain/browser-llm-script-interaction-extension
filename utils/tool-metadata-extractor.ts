@@ -1,5 +1,6 @@
 import { type ZodTypeAny, z } from 'zod/v3';
 import { availableTools } from './ai-tools';
+import { createLogger } from './debug-logger';
 
 export interface ToolMetadata {
   name: string;
@@ -94,6 +95,7 @@ function extractZodSchemaInfo(
  * Extract metadata from all available AI SDK tools
  */
 export function extractToolsMetadata(): ToolMetadata[] {
+  const logger = createLogger('background');
   const toolsMetadata: ToolMetadata[] = [];
 
   for (const [toolName, toolDefinition] of Object.entries(availableTools)) {
@@ -120,7 +122,7 @@ export function extractToolsMetadata(): ToolMetadata[] {
 
       toolsMetadata.push(metadata);
     } catch (error) {
-      console.warn(`Failed to extract metadata for tool ${toolName}:`, error);
+      logger.warn(`Failed to extract metadata for tool ${toolName}`, { toolName, error });
 
       // Fallback metadata
       toolsMetadata.push({

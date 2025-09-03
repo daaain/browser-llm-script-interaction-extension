@@ -12,6 +12,7 @@ import type {
   MessageToSidebar,
 } from '~/utils/types';
 import { createStableId, isExtensionSettings } from '~/utils/types';
+import DebugLogViewer from './components/DebugLogViewer';
 import ManualToolInterface from './ManualToolInterface';
 import { MemoizedMarkdown } from './MemoizedMarkdown';
 
@@ -278,6 +279,8 @@ const ChatInterface: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<{ text: string; type?: 'error' | 'thinking' }>({ text: '' });
   const [tabId, setTabId] = useState<number | null>(null);
+  const [showDebugLogs, setShowDebugLogs] = useState(false);
+  const [showToolsPanel, setShowToolsPanel] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isRefreshingRef = useRef(false);
@@ -295,12 +298,6 @@ const ChatInterface: React.FC = () => {
 
   const getTabChatHistory = useCallback(
     (settings: ExtensionSettings | null, currentTabId: number | null): ChatMessage[] => {
-      sidepanelLogger.debug('getTabChatHistory called', {
-        hasSettings: !!settings,
-        currentTabId,
-        settingsType: typeof settings,
-      });
-
       if (!settings) {
         sidepanelLogger.debug('No settings, returning empty array');
         return [];
@@ -314,12 +311,6 @@ const ChatInterface: React.FC = () => {
       }
 
       const tabConversations = settings.tabConversations?.[currentTabId.toString()];
-      sidepanelLogger.debug('Tab conversations lookup', {
-        hasTabConversations: !!settings.tabConversations,
-        tabKey: currentTabId.toString(),
-        foundConversation: !!tabConversations,
-        conversationLength: tabConversations?.length || 0,
-      });
 
       return tabConversations || [];
     },
@@ -560,18 +551,9 @@ const ChatInterface: React.FC = () => {
   };
 
   const renderAssistantMessage = (message: ChatMessage) => {
-    sidepanelLogger.debug('renderAssistantMessage called', {
-      messageId: message.id,
-      hasContent: !!message.content,
-    });
-
     // Process AI SDK UI parts structure
     const messageWithParts = message as StreamingChatMessageWithParts;
     if (messageWithParts.parts && Array.isArray(messageWithParts.parts)) {
-      sidepanelLogger.debug('Processing message parts (AI SDK UI)', {
-        partCount: messageWithParts.parts.length,
-      });
-
       return (
         <div className="assistant-message">
           {messageWithParts.parts.map((part: MessagePart, index: number) => (
@@ -601,23 +583,41 @@ const ChatInterface: React.FC = () => {
       <header className="chat-header">
         <h1>LLM Chat</h1>
         <div className="header-buttons">
+          {settings?.debugMode && (
+            <button
+              type="button"
+              onClick={() => setShowDebugLogs(!showDebugLogs)}
+              className="header-btn"
+              title="View debug logs"
+            >
+              🐛 Logs
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowToolsPanel(!showToolsPanel)}
+            className="header-btn"
+            title="Toggle manual tools panel"
+          >
+            🛠️ Tools
+          </button>
           <button
             type="button"
             id="clear-btn"
             onClick={clearChat}
-            className="clear-btn"
+            className="header-btn"
             title="Clear Chat"
           >
-            🗑️
+            🗑️ Clear
           </button>
           <button
             type="button"
             id="settings-btn"
             onClick={openSettings}
-            className="settings-btn"
+            className="header-btn"
             title="Open Settings"
           >
-            ⚙️
+            ⚙️ Settings
           </button>
         </div>
       </header>
@@ -637,13 +637,6 @@ const ChatInterface: React.FC = () => {
             </div>
           ) : (
             (() => {
-              sidepanelLogger.debug('Rendering messages', {
-                messageCount: messages?.length || 0,
-                isArray: Array.isArray(messages),
-                messageTypes: Array.isArray(messages)
-                  ? messages.filter((m) => m).map((m) => m.role)
-                  : [],
-              });
               return (Array.isArray(messages) ? messages : [])
                 .filter((message) => {
                   if (!message) {
@@ -676,7 +669,11 @@ const ChatInterface: React.FC = () => {
         </span>
       </div>
 
-      <ManualToolInterface onExecuteTool={testFunction} isExecuting={isLoading} />
+      {showToolsPanel && (
+        <ManualToolInterface onExecuteTool={testFunction} isExecuting={isLoading} />
+      )}
+
+      <DebugLogViewer isVisible={showDebugLogs} onClose={() => setShowDebugLogs(false)} />
 
       <div className="input-container">
         <textarea

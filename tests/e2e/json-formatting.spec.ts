@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import { testTimeouts } from './test-constants';
 import './types';
 
 test.describe('JSON Formatting in Tool Results', () => {
@@ -54,7 +55,7 @@ test.describe('JSON Formatting in Tool Results', () => {
     await expect(sidepanelPage.locator('.chat-container')).toBeVisible();
 
     // Step 3: Mock the LLM response to include tool calls
-    // We'll intercept the fetch to the LLM API and return a mock response
+    // Return a non-streaming response to simplify the test
     await sidepanelPage.route('http://localhost:1234/v1/chat/completions', async (route) => {
       const mockResponse = {
         id: 'mock-response',
@@ -73,7 +74,7 @@ test.describe('JSON Formatting in Tool Results', () => {
                   type: 'function',
                   function: {
                     name: 'find',
-                    arguments: JSON.stringify({ pattern: 'search' }),
+                    arguments: '{"pattern": "search"}',
                   },
                 },
               ],
@@ -90,6 +91,12 @@ test.describe('JSON Formatting in Tool Results', () => {
       });
     });
 
+    // Also mock the tool execution response
+    await sidepanelPage.route('**/chrome-extension/*/background.js', async (route) => {
+      // Let through all background script requests normally
+      await route.continue();
+    });
+
     // Step 4: Type a message that would trigger the find tool
     const messageInput = sidepanelPage.locator('input[type="text"], textarea');
     await messageInput.fill('Find search elements on this page');
@@ -98,7 +105,9 @@ test.describe('JSON Formatting in Tool Results', () => {
     await sendButton.click();
 
     // Step 5: Wait for the tool call to appear
-    await expect(sidepanelPage.locator('.tool-call')).toBeVisible({ timeout: 20000 });
+    await expect(sidepanelPage.locator('.tool-call')).toBeVisible({
+      timeout: testTimeouts.NORMAL_STREAMING,
+    });
 
     // Verify the tool call display shows the function name and arguments
     const toolCall = sidepanelPage.locator('.tool-call');
@@ -107,7 +116,9 @@ test.describe('JSON Formatting in Tool Results', () => {
     await expect(toolCall).toContainText('search');
 
     // Step 6: Wait for tool result to appear
-    await expect(sidepanelPage.locator('.tool-result')).toBeVisible({ timeout: 15000 });
+    await expect(sidepanelPage.locator('.tool-result')).toBeVisible({
+      timeout: testTimeouts.NORMAL_STREAMING,
+    });
 
     // Step 7: Get the tool result content and verify JSON formatting
     const toolResult = sidepanelPage.locator('.tool-result pre code');
@@ -256,7 +267,7 @@ test.describe('JSON Formatting in Tool Results', () => {
                   type: 'function',
                   function: {
                     name: 'extract',
-                    arguments: JSON.stringify({}),
+                    arguments: '{}',
                   },
                 },
               ],
@@ -280,7 +291,9 @@ test.describe('JSON Formatting in Tool Results', () => {
     await sendButton.click();
 
     // Wait for tool result
-    await expect(sidepanelPage.locator('.tool-result')).toBeVisible({ timeout: 15000 });
+    await expect(sidepanelPage.locator('.tool-result')).toBeVisible({
+      timeout: testTimeouts.NORMAL_STREAMING,
+    });
 
     const toolResult = sidepanelPage.locator('.tool-result pre code');
     const resultText = await toolResult.textContent();
